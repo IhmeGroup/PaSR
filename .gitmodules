@@ -1,0 +1,3 @@
+[submodule "external/tomlplusplus"]
+	path = external/tomlplusplus
+	url = git@github.com:marzer/tomlplusplus.git

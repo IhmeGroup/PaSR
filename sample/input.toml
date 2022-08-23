@@ -1,0 +1,24 @@
+[Mechanism]
+name = "../mech/Fang_2018.cti"
+
+[Numerics]
+n_particles = 1000
+n_steps = 10
+t_stop = 10
+dt = 1.0e-8
+
+[Models]
+mixing_model = "IEM"
+
+[Conditions]
+pressure = 101325.0
+comp_fuel = "C12H26:1.0"
+comp_ox = "O2:0.21,N2:0.79"
+T_fuel = 300.0
+T_ox = 1200.0
+phi_global = 1.0
+tau_res = 1.0e-3
+tau_mix = 1.0e-4
+
+[Computation]
+n_threads = 10
