@@ -1,8 +1,8 @@
 [Mechanism]
-name = "../mech/Fang_2018.cti"
+name = "./gri30.yaml"
 
 [Numerics]
-n_particles = 1000
+n_particles = 10
 n_steps = 10
 t_stop = 1.0
 dt = 1.0e-8
@@ -12,7 +12,7 @@ mixing_model = "IEM"
 
 [Conditions]
 pressure = 101325.0
-comp_fuel = "C12H26:1.0"
+comp_fuel = "CH4:1.0"
 comp_ox = "O2:0.21,N2:0.79"
 T_fuel = 300.0
 T_ox = 1200.0

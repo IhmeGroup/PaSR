@@ -2,16 +2,16 @@
 
 #include "../cpptoml/include/cpptoml.h"
 
-#include "Solver.h"
+#include "Reactor.h"
 
-Solver::Solver(const std::string& input_filename_) :
+Reactor::Reactor(const std::string& input_filename_) :
     input_filename(input_filename_),
     step(0), t(0.0)
 {
     parseInput();
 }
 
-void Solver::parseInput() {
+void Reactor::parseInput() {
     auto config = cpptoml::parse_file(input_filename);
 
     // Mechanism
@@ -74,43 +74,58 @@ void Solver::parseInput() {
     std::cout << "Computation.n_threads = " << n_threads << std::endl;
 }
 
-void Solver::initialize() {
+void Reactor::initialize() {
     sol = Cantera::newSolution(mech_filename);
     gas = sol->thermo();
-    gas->setState_TPX(T_fuel, P, comp_fuel);
-    std::cout << gas->report() << std::endl;
-    // nsp = gas.nSpecies();
-    // nv = nsp + 2;
-    // pvec.resize(np);
-    // data.resize(nv*np);
-    // for (int ip = 0; ip < np; ip++) {
-    //     pvec[ip]->setData(*data);
-    //     pvec[ip]->setOffset(ip*nv);
-    //     pvec[ip]->seta(0.0);
-    //     pvec[ip]->setT(T_fuel);
-    // }
+    
+    nsp = gas->nSpecies();
+    nv = nsp + 2;
+    pvec.resize(np);
+    solvec.resize(nv*np);
+    Y_fuel.resize(nsp);
+    Y_ox.resize(nsp);
+    Y_phi.resize(nsp);
+    Y_equil.resize(nsp);
 
-    // gas.setState_TPX(T_fuel, P, comp_fuel);
-    // Y_fuel = gas.Y();
-    // gas.setState_TPX(T_ox, P, comp_ox);
-    // Y_ox = gas.Y();
-    // gas.setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
-    // Y_phi = gas.Y();
-    throw Cantera::NotImplementedError("Solver::initialize");
+    gas->setState_TPX(T_fuel, P, comp_fuel);
+    gas->getMassFractions(Y_fuel.data());
+    gas->setState_TPX(T_ox, P, comp_ox);
+    gas->getMassFractions(Y_ox.data());
+    gas->setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
+    gas->getMassFractions(Y_phi.data());
+    gas->equilibrate("HP");
+    T_equil = gas->temperature();
+    gas->getMassFractions(Y_equil.data());
+
+    for (int ip = 0; ip < np; ip++) {
+        pvec[ip].setSolVec(solvec.data());
+        pvec[ip].setOffset(ip*nv);
+        pvec[ip].setnsp(nsp);
+        pvec[ip].setnv(nv);
+        pvec[ip].seta(0.0);
+        pvec[ip].setT(T_equil);
+        pvec[ip].setY(Y_equil.data());
+    }
+
+    for (Particle& p : pvec) {
+        p.print();
+    }
+
+    throw Cantera::NotImplementedError("Reactor::initialize");
 }
 
-void Solver::run() {
+void Reactor::run() {
     while (!runDone()) {
         takeStep();
     }
     std::cout << "Done." << std::endl;
 }
 
-void Solver::print() {
+void Reactor::print() {
     std::cout << "step: " << step << "\tt: " << t << std::endl;
 }
 
-void Solver::takeStep() {
+void Reactor::takeStep() {
     print();
 
     // Reaction substep
@@ -123,7 +138,7 @@ void Solver::takeStep() {
     t += dt;
 }
 
-bool Solver::runDone() {
+bool Reactor::runDone() {
     if ((n_steps > 0) && (step >= n_steps)) {
         std::cout << "Reached termination condition: step >= n_steps" << std::endl;
         return true;
@@ -135,5 +150,5 @@ bool Solver::runDone() {
     return false;
 }
 
-Solver::~Solver() {
+Reactor::~Reactor() {
 }

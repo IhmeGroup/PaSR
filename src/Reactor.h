@@ -4,15 +4,17 @@
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
+#include "cantera/thermo.h"
 
+#include "Injector.h"
 #include "Particle.h" 
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 
-class Solver {
+class Reactor {
 public:
-    explicit Solver(const std::string& input_filename_);
-    ~Solver();
+    explicit Reactor(const std::string& input_filename_);
+    ~Reactor();
     void initialize();
     void run();
     void print();
@@ -44,16 +46,18 @@ protected:
     MixingModel mixing_model;
     double P;
     std::string comp_fuel, comp_ox;
-    double T_fuel, T_ox;
+    double T_fuel, T_ox, T_equil;
     double phi_global;
     double tau_res, tau_mix;
 
     std::shared_ptr<Cantera::Solution> sol = nullptr;
     std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
-    std::vector<double> data;
+    std::vector<double> solvec;
     std::vector<Particle> pvec;
+    std::vector<Injector> injvec;
     unsigned int nsp;
     unsigned int nv;
+    std::vector<double> Y_fuel, Y_ox, Y_phi, Y_equil;
 
     unsigned int n_threads;
 

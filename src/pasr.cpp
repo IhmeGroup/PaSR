@@ -1,7 +1,7 @@
 #include <iostream>
 #include <omp.h>
 
-#include "Solver.h"
+#include "Reactor.h"
 
 int main(int argc, char *argv[]) {
     // Get input file from command line
@@ -17,8 +17,8 @@ int main(int argc, char *argv[]) {
         throw(0);
     }
 
-    Solver* solver = new Solver(input_filename);
-    solver->initialize();
-    solver->run();
+    Reactor* reactor = new Reactor(input_filename);
+    reactor->initialize();
+    reactor->run();
     return -1;
 }
