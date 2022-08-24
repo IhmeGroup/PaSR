@@ -1,3 +1,6 @@
 [submodule "external/tomlplusplus"]
 	path = external/tomlplusplus
 	url = git@github.com:marzer/tomlplusplus.git
+[submodule "cpptoml"]
+	path = cpptoml
+	url = git@github.com:skystrife/cpptoml.git

@@ -1,5 +1,5 @@
 #include <omp.h>
-#include "../external/tomlplusplus/toml.hpp"
+#include "../cpptoml/include/cpptoml.h"
 
 #include "solver.h"
 
@@ -11,24 +11,24 @@ Solver::Solver(const std::string& input_filename_) :
 }
 
 void Solver::parseInput() {
-    auto config = toml::parse_file(input_filename);
+    auto config = cpptoml::parse_file(input_filename);
 
     // Mechanism
-    mech_filename = config["Mechanism"]["name"].value_or("");
+    mech_filename = config->get_qualified_as<std::string>("Mechanism.name").value_or("");
     std::cout << "Mechanism.name = " << mech_filename << std::endl;
 
     // Numerics
-    n_particles = config["Numerics"]["n_particles"].value_or(0);
+    n_particles = config->get_qualified_as<double>("Numerics.n_particles").value_or(0);
     std::cout << "Numerics.n_particles = " << n_particles << std::endl;
-    n_steps = config["Numerics"]["n_steps"].value_or(-1);
+    n_steps = config->get_qualified_as<int>("Numerics.n_steps").value_or(-1);
     std::cout << "Numerics.n_steps = " << n_steps << std::endl;
-    t_stop = config["Numerics"]["t_stop"].value_or(-1.0);
+    t_stop = config->get_qualified_as<double>("Numerics.t_stop").value_or(-1.0);
     std::cout << "Numerics.t_stop = " << t_stop << std::endl;
-    dt = config["Numerics"]["dt"].value_or(0.0);
+    dt = config->get_qualified_as<double>("Numerics.dt").value_or(0.0);
     std::cout << "Numerics.dt = " << dt << std::endl;
 
     // Models
-    std::string mixing_model_str = config["Models"]["mixing_model"].value_or("FULL_MIX");
+    std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or("FULL_MIX");
     if (mixing_model_str == "NO_MIX") {
         mixing_model = NO_MIX;
     }else if (mixing_model_str == "FULL_MIX") {
@@ -51,25 +51,25 @@ void Solver::parseInput() {
     std::cout << "Models.mixing_model = " << mixingModelString(mixing_model) << std::endl;
 
     // Conditions
-    P = config["Conditions"]["pressure"].value_or(101325.0);
+    P = config->get_qualified_as<double>("Conditions.pressure").value_or(101325.0);
     std::cout << "Conditions.pressure = " << P << std::endl;
-    comp_fuel = config["Conditions"]["comp_fuel"].value_or("");
+    comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or("");
     std::cout << "Conditions.comp_fuel = " << comp_fuel << std::endl;
-    comp_ox = config["Conditions"]["comp_ox"].value_or("");
+    comp_ox = config->get_qualified_as<std::string>("Conditions.comp_ox").value_or("");
     std::cout << "Conditions.comp_ox = " << comp_ox << std::endl;
-    T_fuel = config["Conditions"]["T_fuel"].value_or(300.0);
+    T_fuel = config->get_qualified_as<double>("Conditions.T_fuel").value_or(300.0);
     std::cout << "Conditions.T_fuel = " << T_fuel << std::endl;
-    T_ox = config["Conditions"]["T_ox"].value_or(300.0);
+    T_ox = config->get_qualified_as<double>("Conditions.T_ox").value_or(300.0);
     std::cout << "Conditions.T_ox = " << T_ox << std::endl;
-    phi_global = config["Conditions"]["phi_global"].value_or(1.0);
+    phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(1.0);
     std::cout << "Conditions.phi_global = " << phi_global << std::endl;
-    tau_res = config["Conditions"]["tau_res"].value_or(1.0);
+    tau_res = config->get_qualified_as<double>("Conditions.tau_res").value_or(1.0);
     std::cout << "Conditions.tau_res = " << tau_res << std::endl;
-    tau_mix = config["Conditions"]["tau_mix"].value_or(1.0);
+    tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(1.0);
     std::cout << "Conditions.tau_mix = " << tau_mix << std::endl;
 
     // Computation
-    n_threads = config["Computation"]["n_threads"].value_or(omp_get_max_threads());
+    n_threads = config->get_qualified_as<int>("Computation.n_threads").value_or(omp_get_max_threads());
     std::cout << "Computation.n_threads = " << n_threads << std::endl;
 }
 

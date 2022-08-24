@@ -4,7 +4,7 @@ name = "../mech/Fang_2018.cti"
 [Numerics]
 n_particles = 1000
 n_steps = 10
-t_stop = 10
+t_stop = 1.0
 dt = 1.0e-8
 
 [Models]
