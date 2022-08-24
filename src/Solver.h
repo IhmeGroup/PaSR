@@ -2,7 +2,10 @@
 #include <string>
 #include <vector>
 
+#include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
+
+#include "Particle.h" 
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 
@@ -10,6 +13,7 @@ class Solver {
 public:
     explicit Solver(const std::string& input_filename_);
     ~Solver();
+    void initialize();
     void run();
     void print();
 
@@ -31,7 +35,7 @@ protected:
 
     std::string input_filename;
     std::string mech_filename;
-    unsigned int n_particles;
+    unsigned int np;
     int n_steps;
     double t_stop;
     double dt;
@@ -44,8 +48,12 @@ protected:
     double phi_global;
     double tau_res, tau_mix;
 
-    Cantera::Solution* gas = nullptr;
+    std::shared_ptr<Cantera::Solution> sol = nullptr;
+    std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
     std::vector<double> data;
+    std::vector<Particle> pvec;
+    unsigned int nsp;
+    unsigned int nv;
 
     unsigned int n_threads;
 

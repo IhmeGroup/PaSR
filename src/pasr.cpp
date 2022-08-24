@@ -17,7 +17,8 @@ int main(int argc, char *argv[]) {
         throw(0);
     }
 
-    Solver* test = new Solver(input_filename);
-    test->run();
+    Solver* solver = new Solver(input_filename);
+    solver->initialize();
+    solver->run();
     return -1;
 }

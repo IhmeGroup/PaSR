@@ -1,4 +1,5 @@
 #include <omp.h>
+
 #include "../cpptoml/include/cpptoml.h"
 
 #include "Solver.h"
@@ -18,8 +19,8 @@ void Solver::parseInput() {
     std::cout << "Mechanism.name = " << mech_filename << std::endl;
 
     // Numerics
-    n_particles = config->get_qualified_as<double>("Numerics.n_particles").value_or(0);
-    std::cout << "Numerics.n_particles = " << n_particles << std::endl;
+    np = config->get_qualified_as<double>("Numerics.n_particles").value_or(0);
+    std::cout << "Numerics.n_particles = " << np << std::endl;
     n_steps = config->get_qualified_as<int>("Numerics.n_steps").value_or(-1);
     std::cout << "Numerics.n_steps = " << n_steps << std::endl;
     t_stop = config->get_qualified_as<double>("Numerics.t_stop").value_or(-1.0);
@@ -73,6 +74,31 @@ void Solver::parseInput() {
     std::cout << "Computation.n_threads = " << n_threads << std::endl;
 }
 
+void Solver::initialize() {
+    sol = Cantera::newSolution(mech_filename);
+    gas = sol->thermo();
+    gas->setState_TPX(T_fuel, P, comp_fuel);
+    std::cout << gas->report() << std::endl;
+    // nsp = gas.nSpecies();
+    // nv = nsp + 2;
+    // pvec.resize(np);
+    // data.resize(nv*np);
+    // for (int ip = 0; ip < np; ip++) {
+    //     pvec[ip]->setData(*data);
+    //     pvec[ip]->setOffset(ip*nv);
+    //     pvec[ip]->seta(0.0);
+    //     pvec[ip]->setT(T_fuel);
+    // }
+
+    // gas.setState_TPX(T_fuel, P, comp_fuel);
+    // Y_fuel = gas.Y();
+    // gas.setState_TPX(T_ox, P, comp_ox);
+    // Y_ox = gas.Y();
+    // gas.setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
+    // Y_phi = gas.Y();
+    throw Cantera::NotImplementedError("Solver::initialize");
+}
+
 void Solver::run() {
     while (!runDone()) {
         takeStep();
@@ -86,6 +112,13 @@ void Solver::print() {
 
 void Solver::takeStep() {
     print();
+
+    // Reaction substep
+// #pragma omp parallel for
+//     for (Particle& p : pvec) {
+//         p->react(dt);
+//     }
+
     step++;
     t += dt;
 }
@@ -103,5 +136,4 @@ bool Solver::runDone() {
 }
 
 Solver::~Solver() {
-    delete gas;
 }

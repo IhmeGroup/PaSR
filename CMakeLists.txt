@@ -29,9 +29,18 @@ link_directories(
 
 add_executable(pasr
         src/pasr.cpp
-        src/solver.cpp
-        src/solver.h)
+        src/Solver.cpp
+        src/Solver.h
+        src/Particle.cpp
+        src/Particle.h)
 target_link_libraries(pasr)
 if(OpenMP_CXX_FOUND)
-    target_link_libraries(pasr PUBLIC cantera OpenMP::OpenMP_CXX)
+    target_link_libraries(
+        pasr
+        PUBLIC
+        cantera
+        sundials_cvodes
+        sundials_ida
+        sundials_nvecserial
+        OpenMP::OpenMP_CXX)
 endif()
