@@ -1,7 +1,7 @@
 #include <iostream>
 #include <omp.h>
 
-#include "solver.h"
+#include "Solver.h"
 
 int main(int argc, char *argv[]) {
     // Get input file from command line

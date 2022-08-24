@@ -1,7 +1,7 @@
 #include <omp.h>
 #include "../cpptoml/include/cpptoml.h"
 
-#include "solver.h"
+#include "Solver.h"
 
 Solver::Solver(const std::string& input_filename_) :
     input_filename(input_filename_),
@@ -100,4 +100,8 @@ bool Solver::runDone() {
         return true;
     }
     return false;
+}
+
+Solver::~Solver() {
+    delete gas;
 }
