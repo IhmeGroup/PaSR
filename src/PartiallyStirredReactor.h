@@ -56,10 +56,12 @@ protected:
     double phi_global;
     double tau_res, tau_mix;
 
-    std::shared_ptr<Cantera::Solution> sol = nullptr;
-    std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
-    std::vector<double> solvec;
-    std::vector<double> soltemp;
+    std::vector<std::shared_ptr<Cantera::Solution>> solvec;
+    std::vector<std::shared_ptr<Cantera::ThermoPhase>> gasvec;
+    std::vector<Cantera::IdealGasConstPressureReactor*> reactorvec;
+    std::vector<Cantera::ReactorNet*> rnetvec;
+
+    std::vector<double> xvec;
     std::vector<Particle> pvec;
     std::vector<Injector> injvec;
     unsigned int nsp;

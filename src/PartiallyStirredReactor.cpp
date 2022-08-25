@@ -105,37 +105,49 @@ void PartiallyStirredReactor::initialize() {
         std::cout << "Setting dt automatically: " << dt << std::endl;
     }
 
-    sol = Cantera::newSolution(mech_filename);
-    gas = sol->thermo();
+    std::cout << "Initializing cantera reactor net for each thread" << std::endl;
+    solvec.resize(omp_get_max_threads());
+    gasvec.resize(omp_get_max_threads());
+    reactorvec.resize(omp_get_max_threads());
+    rnetvec.resize(omp_get_max_threads());
+#pragma omp parallel for
+    for (int it = 0; it < omp_get_max_threads(); it++) {
+        solvec[it] = Cantera::newSolution(mech_filename);
+        gasvec[it] = solvec[it]->thermo();
+        reactorvec[it] = new Cantera::IdealGasConstPressureReactor();
+        reactorvec[it]->insert(solvec[it]);
+        rnetvec[it] = new Cantera::ReactorNet();
+        rnetvec[it]->addReactor(*reactorvec[it]);
+    }
     
-    nsp = gas->nSpecies();
+    nsp = gasvec[0]->nSpecies();
     nv = nsp + 2;
     pvec.resize(np);
-    solvec.resize(nv*np);
+    xvec.resize(nv*np);
     Y_fuel.resize(nsp);
     Y_ox.resize(nsp);
     Y_phi.resize(nsp);
 
     // Get compositions
-    gas->setState_TPX(T_fuel, P, comp_fuel);
-    gas->getMassFractions(Y_fuel.data());
-    h_fuel = gas->enthalpy_mass();
-    gas->setState_TPX(T_ox, P, comp_ox);
-    gas->getMassFractions(Y_ox.data());
-    h_ox = gas->enthalpy_mass();
-    gas->setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
-    gas->getMassFractions(Y_phi.data());
-    double Zeq = gas->mixtureFraction(comp_fuel, comp_ox);
+    gasvec[0]->setState_TPX(T_fuel, P, comp_fuel);
+    gasvec[0]->getMassFractions(Y_fuel.data());
+    h_fuel = gasvec[0]->enthalpy_mass();
+    gasvec[0]->setState_TPX(T_ox, P, comp_ox);
+    gasvec[0]->getMassFractions(Y_ox.data());
+    h_ox = gasvec[0]->enthalpy_mass();
+    gasvec[0]->setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
+    gasvec[0]->getMassFractions(Y_phi.data());
+    double Zeq = gasvec[0]->mixtureFraction(comp_fuel, comp_ox);
 
     // // Compute effective C and H numbers in fuel
-    // gas->setState_TPX(T_fuel, P, comp_fuel);
+    // gasvec[0]->setState_TPX(T_fuel, P, comp_fuel);
     // double C_eff = 0.0;
     // double H_eff = 0.0;
-    // int iC = gas->elementIndex("C");
-    // int iH = gas->elementIndex("H");
+    // int iC = gasvec[0]->elementIndex("C");
+    // int iH = gasvec[0]->elementIndex("H");
     // for (size_t k = 0; k < nsp; k++) {
-    //     C_eff += gas->moleFraction(k) * gas->nAtoms(k, iC);
-    //     H_eff += gas->moleFraction(k) * gas->nAtoms(k, iH);
+    //     C_eff += gasvec[0]->moleFraction(k) * gasvec[0]->nAtoms(k, iC);
+    //     H_eff += gasvec[0]->moleFraction(k) * gasvec[0]->nAtoms(k, iH);
     // }
 
     // // Compute stoichiometric fuel/air ratio
@@ -146,22 +158,22 @@ void PartiallyStirredReactor::initialize() {
     //         YFF += Y_fuel[k];
     //     }
     // }
-    // double YOO = Y_ox[gas->speciesIndex("O2")];
+    // double YOO = Y_ox[gasvec[0]->speciesIndex("O2")];
     // double S = s * YFF / YOO;
 
     // Compute equilibrium state (for initialization)
-    gas->setState_TPY(T_init, P, Y_phi.data());
-    gas->equilibrate("HP");
-    double T_equil = gas->temperature();
-    double h_equil = gas->enthalpy_mass();
+    gasvec[0]->setState_TPY(T_init, P, Y_phi.data());
+    gasvec[0]->equilibrate("HP");
+    double T_equil = gasvec[0]->temperature();
+    double h_equil = gasvec[0]->enthalpy_mass();
     std::vector<double> Y_equil(nsp);
-    gas->getMassFractions(Y_equil.data());
+    gasvec[0]->getMassFractions(Y_equil.data());
 
     // Initialize particles
     std::cout << "Initializing particles" << std::endl;
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
-        pvec[ip].setSolVec(solvec.data());
+        pvec[ip].setSolVec(xvec.data());
         pvec[ip].setP(&P);
         pvec[ip].setIndex(ip);
         pvec[ip].setnsp(nsp);
@@ -170,7 +182,6 @@ void PartiallyStirredReactor::initialize() {
         pvec[ip].seta(0.0);
         pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
-        pvec[ip].initialize(mech_filename);
         // pvec[ip].print();
     }
     std::cout << "Done initializing particles" << std::endl;
@@ -286,7 +297,8 @@ void PartiallyStirredReactor::subStepMix() {
 void PartiallyStirredReactor::subStepReact() {
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
-        pvec[ip].react(mech_filename, dt);
+        // Use the current thread's reactor for calculation
+        pvec[ip].react(rnetvec[omp_get_thread_num()], dt);
     }
 }
 

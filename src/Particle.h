@@ -14,38 +14,36 @@ public:
     explicit Particle();
     ~Particle();
 
-    void initialize(const std::string& mech_filename);
+    // Particle operator+= (const Particle& rhs)& {
+    //     for (int iv = 0; iv < nv; iv++) {
+    //         state(iv) += rhs.state(iv);
+    //     }
+    //     return *this;
+    // }
 
-    Particle operator+= (const Particle& rhs)& {
-        for (int iv = 0; iv < nv; iv++) {
-            state(iv) += rhs.state(iv);
-        }
-        return *this;
-    }
-
-    friend Particle operator+ (Particle lhs, const Particle& rhs) {
-        lhs += rhs;
-        return lhs;
-    }
+    // friend Particle operator+ (Particle lhs, const Particle& rhs) {
+    //     lhs += rhs;
+    //     return lhs;
+    // }
 
     double& P() {
         return *m_P;
     }
 
     double* state() {
-        return &solvec[solIndex(0)];
+        return &xvec[solIndex(0)];
     }
 
     double& state(const int& i) {
-        return solvec[solIndex(i)];
+        return xvec[solIndex(i)];
     }
 
     double& a() {
-        return solvec[solIndex(c_offset_a)];
+        return xvec[solIndex(c_offset_a)];
     }
 
     double& h() {
-        return solvec[solIndex(c_offset_h)];
+        return xvec[solIndex(c_offset_h)];
     }
 
     double& T() {
@@ -53,15 +51,15 @@ public:
     }
 
     double* Y() {
-        return &solvec[solIndex(c_offset_Y)];
+        return &xvec[solIndex(c_offset_Y)];
     }
 
     double& Y(const int& k) {
-        return solvec[solIndex(c_offset_Y + k)];
+        return xvec[solIndex(c_offset_Y + k)];
     }
 
-    void setSolVec(double* solvec_) {
-        solvec = solvec_;
+    void setSolVec(double* xvec_) {
+        xvec = xvec_;
     }
 
     void setIndex(const int& index_) {
@@ -85,11 +83,11 @@ public:
     }
 
     void seta(const double& a) {
-        solvec[solIndex(c_offset_a)] = a;
+        xvec[solIndex(c_offset_a)] = a;
     }
 
     void seth(const double& h) {
-        solvec[solIndex(c_offset_h)] = h;
+        xvec[solIndex(c_offset_h)] = h;
     }
 
     void setT(const double& T) {
@@ -98,7 +96,7 @@ public:
 
     void setY(const double* Y) {
         for (int k = 0; k < nsp; k++) {
-            solvec[solIndex(c_offset_Y + k)] = Y[k];
+            xvec[solIndex(c_offset_Y + k)] = Y[k];
         }
     }
 
@@ -108,23 +106,21 @@ public:
         setY(Y);
     }
 
-    void setState(const double* state);
+    void setState(const double* state) {
+        throw Cantera::NotImplementedError("Particle::setState(const double* state)");
+    }
 
     void print();
 
-    void react(const std::string& mech_filename, const double& dt);
+    void react(Cantera::ReactorNet* rnet, const double& dt);
 
 protected:
     int solIndex(const int& i) {
         return (index*nv) + i;
     }
 
-    double* solvec = nullptr;
+    double* xvec = nullptr;
     double* m_P = nullptr;
-    std::shared_ptr<Cantera::Solution> sol = nullptr;
-    std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
-    Cantera::IdealGasConstPressureReactor* reactor;
-    Cantera::ReactorNet* rnet;
     int index;
     int nsp;
     int nv;

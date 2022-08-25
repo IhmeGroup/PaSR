@@ -4,15 +4,6 @@ Particle::Particle() {
 
 }
 
-void Particle::initialize(const std::string& mech_filename) {
-    sol = Cantera::newSolution(mech_filename);
-    gas = sol->thermo();
-    reactor = new Cantera::IdealGasConstPressureReactor();
-    reactor->insert(sol);
-    rnet = new Cantera::ReactorNet();
-    rnet->addReactor(*reactor);
-}
-
 void Particle::print() {
     std::cout << "----------" << std::endl;
     std::cout << "Particle " << index << ":" << std::endl;
@@ -26,7 +17,9 @@ void Particle::print() {
     std::cout << "----------" << std::endl;
 }
 
-void Particle::react(const std::string& mech_filename, const double& dt) {
+void Particle::react(Cantera::ReactorNet* rnet, const double& dt) {
+    Cantera::Reactor* reactor = &rnet->reactor(0);
+    Cantera::ThermoPhase* gas = &reactor->contents();
     gas->setState_PY(P(), Y());
     gas->setState_HP(h(), P());
     reactor->syncState();
