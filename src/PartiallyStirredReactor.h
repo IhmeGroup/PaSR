@@ -3,8 +3,7 @@
 #include <vector>
 
 #include "cantera/base/ctexceptions.h"
-#include "cantera/base/Solution.h"
-#include "cantera/thermo.h"
+#include "cantera/core.h"
 
 #include "Injector.h"
 #include "Particle.h"
@@ -25,6 +24,7 @@ protected:
     void subStepInflow();
     void subStepMix();
     void subStepReact();
+    void incrementAge();
     void recycleParticle(const unsigned int& ip, const double& p_inj);
     std::vector<double> meanState();
     bool runDone();

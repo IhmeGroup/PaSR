@@ -105,7 +105,7 @@ void PartiallyStirredReactor::initialize() {
         std::cout << "Setting dt automatically: " << dt << std::endl;
     }
 
-    std::cout << "Initializing cantera reactor net for each thread" << std::endl;
+    std::cout << "Initializing ReactorNet for each thread..." << std::endl;
     solvec.resize(omp_get_max_threads());
     gasvec.resize(omp_get_max_threads());
     reactorvec.resize(omp_get_max_threads());
@@ -119,6 +119,7 @@ void PartiallyStirredReactor::initialize() {
         rnetvec[it] = new Cantera::ReactorNet();
         rnetvec[it]->addReactor(*reactorvec[it]);
     }
+    std::cout << "Done initializing ReactorNets." << std::endl;
     
     nsp = gasvec[0]->nSpecies();
     nv = nsp + 2;
@@ -170,21 +171,19 @@ void PartiallyStirredReactor::initialize() {
     gasvec[0]->getMassFractions(Y_equil.data());
 
     // Initialize particles
-    std::cout << "Initializing particles" << std::endl;
+    std::cout << "Initializing particles..." << std::endl;
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
-        pvec[ip].setSolVec(xvec.data());
         pvec[ip].setP(&P);
         pvec[ip].setIndex(ip);
         pvec[ip].setnsp(nsp);
-        pvec[ip].setnv(nv);
         pvec[ip].setMass(1.0); // TODO: check this
-        pvec[ip].seta(0.0);
+        pvec[ip].setAge(0.0);
         pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
         // pvec[ip].print();
     }
-    std::cout << "Done initializing particles" << std::endl;
+    std::cout << "Done initializing particles." << std::endl;
 
     // Initialize injectors
     for (int iinj = 0; iinj < 2; iinj++) {
@@ -233,10 +232,12 @@ void PartiallyStirredReactor::takeStep() {
     subStepReact();
     // for (Particle& p : pvec) p.print();
 
+    incrementAge();
+
     // Print status
     print();
 
-    // Increment
+    // Increment counters
     step++;
     t += dt;
 }
@@ -302,6 +303,13 @@ void PartiallyStirredReactor::subStepReact() {
     }
 }
 
+void PartiallyStirredReactor::incrementAge() {
+#pragma omp parallel for
+    for (int ip = 0; ip < np; ip++) {
+        pvec[ip].getAge() += dt;
+    }
+}
+
 void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
     int iinj;
     double flow_sum = 0.0;
@@ -312,7 +320,7 @@ void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const doub
             break;
         }
     }
-    pvec[ip].seta(0.0);
+    pvec[ip].setAge(0.0);
     pvec[ip].seth(injvec[iinj].h());
     pvec[ip].setY(injvec[iinj].Y().data());
     // std::cout << "Recycling particle " << ip

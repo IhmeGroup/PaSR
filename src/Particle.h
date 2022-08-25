@@ -1,13 +1,11 @@
 #include <iostream>
 
 #include "cantera/base/ctexceptions.h"
-#include "cantera/base/Solution.h"
-#include "cantera/thermo.h"
+#include "cantera/core.h"
 #include "cantera/zerodim.h"
 
-const size_t c_offset_a = 0; // age
-const size_t c_offset_h = 1; // temperature
-const size_t c_offset_Y = 2; // mass fraction
+const size_t c_offset_h = 0; // enthalpy
+const size_t c_offset_Y = 1; // mass fraction
 
 class Particle {
 public:
@@ -31,19 +29,19 @@ public:
     }
 
     double* state() {
-        return &xvec[solIndex(0)];
+        return &xvec[0];
     }
 
     double& state(const int& i) {
-        return xvec[solIndex(i)];
+        return xvec[i];
     }
 
-    double& a() {
-        return xvec[solIndex(c_offset_a)];
+    double& getAge() {
+        return age;
     }
 
     double& h() {
-        return xvec[solIndex(c_offset_h)];
+        return xvec[c_offset_h];
     }
 
     double& T() {
@@ -51,15 +49,11 @@ public:
     }
 
     double* Y() {
-        return &xvec[solIndex(c_offset_Y)];
+        return &xvec[c_offset_Y];
     }
 
     double& Y(const int& k) {
-        return xvec[solIndex(c_offset_Y + k)];
-    }
-
-    void setSolVec(double* xvec_) {
-        xvec = xvec_;
+        return xvec[c_offset_Y + k];
     }
 
     void setIndex(const int& index_) {
@@ -68,10 +62,8 @@ public:
 
     void setnsp(const int& nsp_) {
         nsp = nsp_;
-    }
-
-    void setnv(const int& nv_) {
-        nv = nv_;
+        nv = nsp + c_offset_Y;
+        xvec.resize(nv);
     }
     
     void setMass(const double& mass_) {
@@ -82,12 +74,12 @@ public:
         m_P = P_;
     }
 
-    void seta(const double& a) {
-        xvec[solIndex(c_offset_a)] = a;
+    void setAge(const double& age_) {
+        age = age_;
     }
 
     void seth(const double& h) {
-        xvec[solIndex(c_offset_h)] = h;
+        xvec[c_offset_h] = h;
     }
 
     void setT(const double& T) {
@@ -96,12 +88,11 @@ public:
 
     void setY(const double* Y) {
         for (int k = 0; k < nsp; k++) {
-            xvec[solIndex(c_offset_Y + k)] = Y[k];
+            xvec[c_offset_Y + k] = Y[k];
         }
     }
 
-    void setState(const double& a, const double& h, double* Y) {
-        seta(a);
+    void setState(const double& h, double* Y) {
         seth(h);
         setY(Y);
     }
@@ -115,15 +106,12 @@ public:
     void react(Cantera::ReactorNet* rnet, const double& dt);
 
 protected:
-    int solIndex(const int& i) {
-        return (index*nv) + i;
-    }
-
-    double* xvec = nullptr;
-    double* m_P = nullptr;
     int index;
     int nsp;
     int nv;
+    double* m_P = nullptr;
+    std::vector<double> xvec;
+    double age;
     double mass;
 
 private:
