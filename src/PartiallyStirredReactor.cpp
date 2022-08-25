@@ -1,9 +1,23 @@
 #include <math.h>
+#include <algorithm>
 #include <omp.h>
 
 #include "../cpptoml/include/cpptoml.h"
 
 #include "PartiallyStirredReactor.h"
+
+#pragma omp declare \
+    reduction( \
+        vec_double_plus : \
+        std::vector<double> : \
+        std::transform( \
+            omp_out.begin(), \
+            omp_out.end(), \
+            omp_in.begin(), \
+            omp_out.begin(), \
+            std::plus<double>())) \
+    initializer( \
+        omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
@@ -244,7 +258,29 @@ void PartiallyStirredReactor::subStepInflow() {
 }
 
 void PartiallyStirredReactor::subStepMix() {
-
+    switch(mixing_model) {
+        case NO_MIX: {
+            break; // Do nothing
+        }
+        case FULL_MIX: {
+            break;
+        }
+        case CURL: {
+            break;
+        }
+        case MOD_CURL: {
+            break;
+        }
+        case IEM: {
+            break;
+        }
+        case EMST: {
+            break;
+        }
+        default: {
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix");
+        }
+    }
 }
 
 void PartiallyStirredReactor::subStepReact() {
@@ -271,6 +307,25 @@ void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const doub
     //     << " to injector " << iinj
     //     << " (p_inj = " << p_inj << ")" << std::endl;
     // pvec[ip].print();
+}
+
+std::vector<double> PartiallyStirredReactor::meanState() {
+
+    // Sum across particles
+    std::vector<double> sumvec(np, 0.0);
+#pragma omp parallel for reduction(vec_double_plus:sumvec)
+    for (int ip = 0; ip < np; ip++) {
+        for (int iv = 0; iv < nv; iv++) {
+            sumvec[iv] += pvec[ip].state(iv);
+        }
+    }
+
+    // Divide by particle count
+    for (auto& el : sumvec) {
+        el /= np;
+    }
+
+    return sumvec;
 }
 
 bool PartiallyStirredReactor::runDone() {

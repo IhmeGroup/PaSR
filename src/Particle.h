@@ -16,8 +16,28 @@ public:
 
     void initialize(const std::string& mech_filename);
 
+    Particle operator+= (const Particle& rhs)& {
+        for (int iv = 0; iv < nv; iv++) {
+            state(iv) += rhs.state(iv);
+        }
+        return *this;
+    }
+
+    friend Particle operator+ (Particle lhs, const Particle& rhs) {
+        lhs += rhs;
+        return lhs;
+    }
+
     double& P() {
         return *m_P;
+    }
+
+    double* state() {
+        return &solvec[solIndex(0)];
+    }
+
+    double& state(const int& i) {
+        return solvec[solIndex(i)];
     }
 
     double& a() {

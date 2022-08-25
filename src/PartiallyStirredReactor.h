@@ -1,14 +1,13 @@
 #include <iostream>
 #include <string>
 #include <vector>
-#include <algorithm>
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
 #include "cantera/thermo.h"
 
 #include "Injector.h"
-#include "Particle.h" 
+#include "Particle.h"
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 
@@ -27,6 +26,7 @@ protected:
     void subStepMix();
     void subStepReact();
     void recycleParticle(const unsigned int& ip, const double& p_inj);
+    std::vector<double> meanState();
     bool runDone();
 
     std::string mixingModelString(MixingModel mixing_model_) {
@@ -59,6 +59,7 @@ protected:
     std::shared_ptr<Cantera::Solution> sol = nullptr;
     std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
     std::vector<double> solvec;
+    std::vector<double> soltemp;
     std::vector<Particle> pvec;
     std::vector<Injector> injvec;
     unsigned int nsp;
