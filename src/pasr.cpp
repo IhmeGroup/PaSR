@@ -1,7 +1,7 @@
 #include <iostream>
 #include <omp.h>
 
-#include "Reactor.h"
+#include "PartiallyStirredReactor.h"
 
 int main(int argc, char *argv[]) {
     // Get input file from command line
@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
         throw(0);
     }
 
-    Reactor* reactor = new Reactor(input_filename);
+    PartiallyStirredReactor* reactor = new PartiallyStirredReactor(input_filename);
     reactor->initialize();
     reactor->run();
     return -1;

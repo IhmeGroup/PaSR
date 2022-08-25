@@ -1,7 +1,9 @@
 #include <iostream>
 
-#include "cantera/thermo.h"
 #include "cantera/base/ctexceptions.h"
+#include "cantera/base/Solution.h"
+#include "cantera/thermo.h"
+#include "cantera/zerodim.h"
 
 const size_t c_offset_a = 0; // age
 const size_t c_offset_h = 1; // temperature
@@ -11,6 +13,12 @@ class Particle {
 public:
     explicit Particle();
     ~Particle();
+
+    void initialize(const std::string& mech_filename);
+
+    double& P() {
+        return *m_P;
+    }
 
     double& a() {
         return solvec[solIndex(c_offset_a)];
@@ -22,6 +30,10 @@ public:
 
     double& T() {
         throw Cantera::NotImplementedError("Particle::T");
+    }
+
+    double* Y() {
+        return &solvec[solIndex(c_offset_Y)];
     }
 
     double& Y(const int& k) {
@@ -46,6 +58,10 @@ public:
     
     void setMass(const double& mass_) {
         mass = mass_;
+    }
+
+    void setP(double* P_) {
+        m_P = P_;
     }
 
     void seta(const double& a) {
@@ -76,7 +92,7 @@ public:
 
     void print();
 
-    void react(const double dt);
+    void react(const std::string& mech_filename, const double& dt);
 
 protected:
     int solIndex(const int& i) {
@@ -84,6 +100,11 @@ protected:
     }
 
     double* solvec = nullptr;
+    double* m_P = nullptr;
+    std::shared_ptr<Cantera::Solution> sol = nullptr;
+    std::shared_ptr<Cantera::ThermoPhase> gas = nullptr;
+    Cantera::IdealGasConstPressureReactor* reactor;
+    Cantera::ReactorNet* rnet;
     int index;
     int nsp;
     int nv;

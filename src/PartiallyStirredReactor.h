@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <algorithm>
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
@@ -11,10 +12,10 @@
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 
-class Reactor {
+class PartiallyStirredReactor {
 public:
-    explicit Reactor(const std::string& input_filename_);
-    ~Reactor();
+    explicit PartiallyStirredReactor(const std::string& input_filename_);
+    ~PartiallyStirredReactor();
     void initialize();
     void run();
     void print();

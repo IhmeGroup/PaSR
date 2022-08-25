@@ -37,8 +37,8 @@ link_directories(
 
 add_executable(${TARGET_NAME}
         src/pasr.cpp
-        src/Reactor.cpp
-        src/Reactor.h
+        src/PartiallyStirredReactor.cpp
+        src/PartiallyStirredReactor.h
         src/Particle.cpp
         src/Particle.h
         src/Injector.cpp

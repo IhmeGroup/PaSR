@@ -3,31 +3,37 @@
 
 #include "../cpptoml/include/cpptoml.h"
 
-#include "Reactor.h"
+#include "PartiallyStirredReactor.h"
 
-Reactor::Reactor(const std::string& input_filename_) :
+PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
     step(0), t(0.0), p_out(0.0)
 {
     parseInput();
 }
 
-void Reactor::parseInput() {
+void PartiallyStirredReactor::parseInput() {
     auto config = cpptoml::parse_file(input_filename);
+
+    std::cout << "----------" << std::endl;
+    std::cout << "Input file parameters:" << std::endl;
 
     // Mechanism
     mech_filename = config->get_qualified_as<std::string>("Mechanism.name").value_or("");
-    std::cout << "Mechanism.name = " << mech_filename << std::endl;
+    std::cout << "> Mechanism.name = " << mech_filename << std::endl;
 
     // Numerics
     np = config->get_qualified_as<double>("Numerics.n_particles").value_or(0);
-    std::cout << "Numerics.n_particles = " << np << std::endl;
+    std::cout << "> Numerics.n_particles = " << np << std::endl;
     n_steps = config->get_qualified_as<int>("Numerics.n_steps").value_or(-1);
-    std::cout << "Numerics.n_steps = " << n_steps << std::endl;
+    if (n_steps > 0)
+        std::cout << "> Numerics.n_steps = " << n_steps << std::endl;
     t_stop = config->get_qualified_as<double>("Numerics.t_stop").value_or(-1.0);
-    std::cout << "Numerics.t_stop = " << t_stop << std::endl;
-    dt = config->get_qualified_as<double>("Numerics.dt").value_or(0.0);
-    std::cout << "Numerics.dt = " << dt << std::endl;
+    if (t_stop > 0)
+        std::cout << "> Numerics.t_stop = " << t_stop << std::endl;
+    dt = config->get_qualified_as<double>("Numerics.dt").value_or(-1.0);
+    if (dt > 0)
+        std::cout << "> Numerics.dt = " << dt << std::endl;
 
     // Models
     std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or("FULL_MIX");
@@ -50,33 +56,40 @@ void Reactor::parseInput() {
           ". Must be NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, or EMST." << std::endl;
         throw(0);
     }
-    std::cout << "Models.mixing_model = " << mixingModelString(mixing_model) << std::endl;
+    std::cout << "> Models.mixing_model = " << mixingModelString(mixing_model) << std::endl;
 
     // Conditions
     P = config->get_qualified_as<double>("Conditions.pressure").value_or(101325.0);
-    std::cout << "Conditions.pressure = " << P << std::endl;
+    std::cout << "> Conditions.pressure = " << P << std::endl;
     comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or("");
-    std::cout << "Conditions.comp_fuel = " << comp_fuel << std::endl;
+    std::cout << "> Conditions.comp_fuel = " << comp_fuel << std::endl;
     comp_ox = config->get_qualified_as<std::string>("Conditions.comp_ox").value_or("");
-    std::cout << "Conditions.comp_ox = " << comp_ox << std::endl;
+    std::cout << "> Conditions.comp_ox = " << comp_ox << std::endl;
     T_fuel = config->get_qualified_as<double>("Conditions.T_fuel").value_or(300.0);
-    std::cout << "Conditions.T_fuel = " << T_fuel << std::endl;
+    std::cout << "> Conditions.T_fuel = " << T_fuel << std::endl;
     T_ox = config->get_qualified_as<double>("Conditions.T_ox").value_or(300.0);
-    std::cout << "Conditions.T_ox = " << T_ox << std::endl;
+    std::cout << "> Conditions.T_ox = " << T_ox << std::endl;
     T_init = config->get_qualified_as<double>("Conditions.T_init").value_or(1500.0);
-    std::cout << "Conditions.T_init = " << T_init << std::endl;
+    std::cout << "> Conditions.T_init = " << T_init << std::endl;
     phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(1.0);
-    std::cout << "Conditions.phi_global = " << phi_global << std::endl;
+    std::cout << "> Conditions.phi_global = " << phi_global << std::endl;
     tau_res = config->get_qualified_as<double>("Conditions.tau_res").value_or(1.0);
-    std::cout << "Conditions.tau_res = " << tau_res << std::endl;
+    std::cout << "> Conditions.tau_res = " << tau_res << std::endl;
     tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(1.0);
-    std::cout << "Conditions.tau_mix = " << tau_mix << std::endl;
+    std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
+
+    std::cout << "----------" << std::endl;
 }
 
-void Reactor::initialize() {
+void PartiallyStirredReactor::initialize() {
     step = 0;
     t = 0.0;
     p_out = 0.0;
+
+    if (dt <= 0.0) {
+        dt = 0.1 * std::min(tau_res, tau_mix);
+        std::cout << "Setting dt automatically: " << dt << std::endl;
+    }
 
     sol = Cantera::newSolution(mech_filename);
     gas = sol->thermo();
@@ -131,8 +144,10 @@ void Reactor::initialize() {
     gas->getMassFractions(Y_equil.data());
 
     // Initialize particles
+    std::cout << "Initializing particles" << std::endl;
     for (int ip = 0; ip < np; ip++) {
         pvec[ip].setSolVec(solvec.data());
+        pvec[ip].setP(&P);
         pvec[ip].setIndex(ip);
         pvec[ip].setnsp(nsp);
         pvec[ip].setnv(nv);
@@ -140,8 +155,10 @@ void Reactor::initialize() {
         pvec[ip].seta(0.0);
         pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
+        pvec[ip].initialize(mech_filename);
         // pvec[ip].print();
     }
+    std::cout << "Done initializing particles" << std::endl;
 
     // Initialize injectors
     for (int iinj = 0; iinj < 2; iinj++) {
@@ -151,33 +168,35 @@ void Reactor::initialize() {
     // Fuel injector
     injvec[0].seth(h_fuel);
     injvec[0].setY(Y_fuel.data());
-    injvec[0].setFlow(Zeq); // TODO: check this
+    injvec[0].setFlow(Zeq);
 
     // Oxidizer injector
     injvec[1].seth(h_ox);
     injvec[1].setY(Y_ox.data());
-    injvec[1].setFlow(1-Zeq); // TODO: check this
+    injvec[1].setFlow(1-Zeq);
 
     for (Injector& inj : injvec) {
         inj.print();
     }
 }
 
-void Reactor::run() {
+void PartiallyStirredReactor::run() {
+    std::cout << "----------" << std::endl;
+    std::cout << "Begin time stepping" << std::endl;
     while (!runDone()) {
         takeStep();
     }
     std::cout << "Done." << std::endl;
 }
 
-void Reactor::print() {
+void PartiallyStirredReactor::print() {
     std::cout << "step: " << step << "\tt: " << t << std::endl;
 }
 
-void Reactor::takeStep() {
+void PartiallyStirredReactor::takeStep() {
 
     // Adjust time step
-    if ((t + dt) > t_stop) {
+    if ((t_stop > 0) && ((t + dt) > t_stop)) {
         dt = t_stop - t;
     }
 
@@ -216,6 +235,10 @@ void Reactor::takeStep() {
     // ====================
     // Reaction substep
     // ====================
+#pragma omp parallel for
+    for (int ip = 0; ip < np; ip++) {
+        pvec[ip].react(mech_filename, dt);
+    }
 
     // Print status
     print();
@@ -225,7 +248,7 @@ void Reactor::takeStep() {
     t += dt;
 }
 
-void Reactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
+void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
     int iinj;
     double flow_sum = 0.0;
     for (int i = 0; i < injvec.size(); i++) {
@@ -244,7 +267,7 @@ void Reactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
     // pvec[ip].print();
 }
 
-bool Reactor::runDone() {
+bool PartiallyStirredReactor::runDone() {
     if ((n_steps > 0) && (step >= n_steps)) {
         std::cout << "Reached termination condition: step >= n_steps" << std::endl;
         return true;
@@ -253,8 +276,9 @@ bool Reactor::runDone() {
         std::cout << "Reached termination condition: t >= t_stop" << std::endl;
         return true;
     }
+    // TODO - residual-based termination
     return false;
 }
 
-Reactor::~Reactor() {
+PartiallyStirredReactor::~PartiallyStirredReactor() {
 }
