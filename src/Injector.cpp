@@ -14,10 +14,11 @@ Injector::Injector(const int& index, const unsigned int& nsp) {
 void Injector::print() {
     std::cout << "----------" << std::endl;
     std::cout << "Injector " << index << ":" << std::endl;
+    std::cout << "> flow: " << getFlow() << std::endl;
     std::cout << "> h: " << h() << std::endl;
     std::cout << "> Y: " << std::endl;
     for (int k = 0; k < nsp; k++) {
-        if (Y(k) > 1.0e-3) {
+        if (Y(k) > 0.0) {
             std::cout << ">   " << k << ": " << Y(k) << std::endl;
         }
     }

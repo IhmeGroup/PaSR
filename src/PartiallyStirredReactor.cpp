@@ -145,6 +145,7 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize particles
     std::cout << "Initializing particles" << std::endl;
+#pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
         pvec[ip].setSolVec(solvec.data());
         pvec[ip].setP(&P);
@@ -190,19 +191,32 @@ void PartiallyStirredReactor::run() {
 }
 
 void PartiallyStirredReactor::print() {
-    std::cout << "step: " << step << "\tt: " << t << std::endl;
+    
 }
 
 void PartiallyStirredReactor::takeStep() {
+    std::cout << "Starting step: " << step << "\tt: " << t << std::endl;
 
     // Adjust time step
     if ((t_stop > 0) && ((t + dt) > t_stop)) {
         dt = t_stop - t;
     }
 
-    // ====================
-    // Inflow substep
-    // ====================
+    // Take substeps
+    subStepInflow();
+    subStepMix();
+    subStepReact();
+    // for (Particle& p : pvec) p.print();
+
+    // Print status
+    print();
+
+    // Increment
+    step++;
+    t += dt;
+}
+
+void PartiallyStirredReactor::subStepInflow() {
     p_out += np * dt / tau_res; // Fractional particle count to recycle
     int np_out = round(p_out); // Round to integer
     p_out -= np_out; // Hold on to remainder for next step
@@ -227,25 +241,17 @@ void PartiallyStirredReactor::takeStep() {
             recycleParticle(ip, p_inj);
         }
     }
+}
 
-    // ====================
-    // Mixing substep
-    // ====================
+void PartiallyStirredReactor::subStepMix() {
 
-    // ====================
-    // Reaction substep
-    // ====================
+}
+
+void PartiallyStirredReactor::subStepReact() {
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
         pvec[ip].react(mech_filename, dt);
     }
-
-    // Print status
-    print();
-
-    // Increment
-    step++;
-    t += dt;
 }
 
 void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const double& p_inj) {

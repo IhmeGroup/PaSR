@@ -23,6 +23,9 @@ public:
 protected:
     void parseInput();
     void takeStep();
+    void subStepInflow();
+    void subStepMix();
+    void subStepReact();
     void recycleParticle(const unsigned int& ip, const double& p_inj);
     bool runDone();
 
