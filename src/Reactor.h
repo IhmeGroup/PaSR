@@ -22,6 +22,7 @@ public:
 protected:
     void parseInput();
     void takeStep();
+    void recycleParticle(const unsigned int& ip, const double& p_inj);
     bool runDone();
 
     std::string mixingModelString(MixingModel mixing_model_) {
@@ -46,7 +47,8 @@ protected:
     MixingModel mixing_model;
     double P;
     std::string comp_fuel, comp_ox;
-    double T_fuel, T_ox, T_equil;
+    double T_fuel, T_ox, T_init;
+    double h_fuel, h_ox;
     double phi_global;
     double tau_res, tau_mix;
 
@@ -57,9 +59,9 @@ protected:
     std::vector<Injector> injvec;
     unsigned int nsp;
     unsigned int nv;
-    std::vector<double> Y_fuel, Y_ox, Y_phi, Y_equil;
+    std::vector<double> Y_fuel, Y_ox, Y_phi;
 
-    unsigned int n_threads;
+    double p_out;
 
 private:
     

@@ -1,9 +1,10 @@
 #include <iostream>
 
+#include "cantera/thermo.h"
 #include "cantera/base/ctexceptions.h"
 
 const size_t c_offset_a = 0; // age
-const size_t c_offset_T = 1; // temperature
+const size_t c_offset_h = 1; // temperature
 const size_t c_offset_Y = 2; // mass fraction
 
 class Particle {
@@ -12,23 +13,27 @@ public:
     ~Particle();
 
     double& a() {
-        return solvec[index(c_offset_a)];
+        return solvec[solIndex(c_offset_a)];
+    }
+
+    double& h() {
+        return solvec[solIndex(c_offset_h)];
     }
 
     double& T() {
-        return solvec[index(c_offset_T)];
+        throw Cantera::NotImplementedError("Particle::T");
     }
 
     double& Y(const int& k) {
-        return solvec[index(c_offset_Y + k)];
+        return solvec[solIndex(c_offset_Y + k)];
     }
 
     void setSolVec(double* solvec_) {
         solvec = solvec_;
     }
 
-    void setOffset(const int& offset_) {
-        offset = offset_;
+    void setIndex(const int& index_) {
+        index = index_;
     }
 
     void setnsp(const int& nsp_) {
@@ -38,24 +43,32 @@ public:
     void setnv(const int& nv_) {
         nv = nv_;
     }
+    
+    void setMass(const double& mass_) {
+        mass = mass_;
+    }
 
     void seta(const double& a) {
-        solvec[index(c_offset_a)] = a;
+        solvec[solIndex(c_offset_a)] = a;
+    }
+
+    void seth(const double& h) {
+        solvec[solIndex(c_offset_h)] = h;
     }
 
     void setT(const double& T) {
-        solvec[index(c_offset_T)] = T;
+        throw Cantera::NotImplementedError("Particle::setT");
     }
 
     void setY(const double* Y) {
         for (int k = 0; k < nsp; k++) {
-            solvec[index(c_offset_Y + k)] = Y[k];
+            solvec[solIndex(c_offset_Y + k)] = Y[k];
         }
     }
 
-    void setState(const double& a, const double& T, double* Y) {
+    void setState(const double& a, const double& h, double* Y) {
         seta(a);
-        setT(T);
+        seth(h);
         setY(Y);
     }
 
@@ -66,14 +79,15 @@ public:
     void react(const double dt);
 
 protected:
-    const int index(const int& i) {
-        return (offset*nv) + i;
+    int solIndex(const int& i) {
+        return (index*nv) + i;
     }
 
-    double* solvec;
-    int offset;
+    double* solvec = nullptr;
+    int index;
     int nsp;
     int nv;
+    double mass;
 
 private:
 };

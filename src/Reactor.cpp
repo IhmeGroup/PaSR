@@ -1,3 +1,4 @@
+#include <math.h>
 #include <omp.h>
 
 #include "../cpptoml/include/cpptoml.h"
@@ -6,7 +7,7 @@
 
 Reactor::Reactor(const std::string& input_filename_) :
     input_filename(input_filename_),
-    step(0), t(0.0)
+    step(0), t(0.0), p_out(0.0)
 {
     parseInput();
 }
@@ -62,19 +63,21 @@ void Reactor::parseInput() {
     std::cout << "Conditions.T_fuel = " << T_fuel << std::endl;
     T_ox = config->get_qualified_as<double>("Conditions.T_ox").value_or(300.0);
     std::cout << "Conditions.T_ox = " << T_ox << std::endl;
+    T_init = config->get_qualified_as<double>("Conditions.T_init").value_or(1500.0);
+    std::cout << "Conditions.T_init = " << T_init << std::endl;
     phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(1.0);
     std::cout << "Conditions.phi_global = " << phi_global << std::endl;
     tau_res = config->get_qualified_as<double>("Conditions.tau_res").value_or(1.0);
     std::cout << "Conditions.tau_res = " << tau_res << std::endl;
     tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(1.0);
     std::cout << "Conditions.tau_mix = " << tau_mix << std::endl;
-
-    // Computation
-    n_threads = config->get_qualified_as<int>("Computation.n_threads").value_or(omp_get_max_threads());
-    std::cout << "Computation.n_threads = " << n_threads << std::endl;
 }
 
 void Reactor::initialize() {
+    step = 0;
+    t = 0.0;
+    p_out = 0.0;
+
     sol = Cantera::newSolution(mech_filename);
     gas = sol->thermo();
     
@@ -85,33 +88,79 @@ void Reactor::initialize() {
     Y_fuel.resize(nsp);
     Y_ox.resize(nsp);
     Y_phi.resize(nsp);
-    Y_equil.resize(nsp);
 
+    // Get compositions
     gas->setState_TPX(T_fuel, P, comp_fuel);
     gas->getMassFractions(Y_fuel.data());
+    h_fuel = gas->enthalpy_mass();
     gas->setState_TPX(T_ox, P, comp_ox);
     gas->getMassFractions(Y_ox.data());
+    h_ox = gas->enthalpy_mass();
     gas->setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
     gas->getMassFractions(Y_phi.data());
+    double Zeq = gas->mixtureFraction(comp_fuel, comp_ox);
+
+    // // Compute effective C and H numbers in fuel
+    // gas->setState_TPX(T_fuel, P, comp_fuel);
+    // double C_eff = 0.0;
+    // double H_eff = 0.0;
+    // int iC = gas->elementIndex("C");
+    // int iH = gas->elementIndex("H");
+    // for (size_t k = 0; k < nsp; k++) {
+    //     C_eff += gas->moleFraction(k) * gas->nAtoms(k, iC);
+    //     H_eff += gas->moleFraction(k) * gas->nAtoms(k, iH);
+    // }
+
+    // // Compute stoichiometric fuel/air ratio
+    // double s = 32.0 * (C_eff + (H_eff/4.0)) / (12.0*C_eff + H_eff);
+    // double YFF = 0.0;
+    // for (int k = 0; k < nsp; k++) {
+    //     if (Y_fuel[k] > 1.0e-3) {
+    //         YFF += Y_fuel[k];
+    //     }
+    // }
+    // double YOO = Y_ox[gas->speciesIndex("O2")];
+    // double S = s * YFF / YOO;
+
+    // Compute equilibrium state (for initialization)
+    gas->setState_TPY(T_init, P, Y_phi.data());
     gas->equilibrate("HP");
-    T_equil = gas->temperature();
+    double T_equil = gas->temperature();
+    double h_equil = gas->enthalpy_mass();
+    std::vector<double> Y_equil(nsp);
     gas->getMassFractions(Y_equil.data());
 
+    // Initialize particles
     for (int ip = 0; ip < np; ip++) {
         pvec[ip].setSolVec(solvec.data());
-        pvec[ip].setOffset(ip*nv);
+        pvec[ip].setIndex(ip);
         pvec[ip].setnsp(nsp);
         pvec[ip].setnv(nv);
+        pvec[ip].setMass(1.0); // TODO: check this
         pvec[ip].seta(0.0);
-        pvec[ip].setT(T_equil);
+        pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
+        // pvec[ip].print();
     }
 
-    for (Particle& p : pvec) {
-        p.print();
+    // Initialize injectors
+    for (int iinj = 0; iinj < 2; iinj++) {
+        injvec.push_back(Injector(iinj, nsp));
     }
 
-    throw Cantera::NotImplementedError("Reactor::initialize");
+    // Fuel injector
+    injvec[0].seth(h_fuel);
+    injvec[0].setY(Y_fuel.data());
+    injvec[0].setFlow(Zeq); // TODO: check this
+
+    // Oxidizer injector
+    injvec[1].seth(h_ox);
+    injvec[1].setY(Y_ox.data());
+    injvec[1].setFlow(1-Zeq); // TODO: check this
+
+    for (Injector& inj : injvec) {
+        inj.print();
+    }
 }
 
 void Reactor::run() {
@@ -126,16 +175,73 @@ void Reactor::print() {
 }
 
 void Reactor::takeStep() {
+
+    // Adjust time step
+    if ((t + dt) > t_stop) {
+        dt = t_stop - t;
+    }
+
+    // ====================
+    // Inflow substep
+    // ====================
+    p_out += np * dt / tau_res; // Fractional particle count to recycle
+    int np_out = round(p_out); // Round to integer
+    p_out -= np_out; // Hold on to remainder for next step
+
+    // Generate random seed for each thread
+    std::vector<int> seedvec(omp_get_max_threads());
+    for (int& seed : seedvec) {
+        seed = rand();
+    }
+
+    unsigned int s;
+#pragma omp parallel private(s)
+    {
+        // Grab this thread's seed
+        s = seedvec[omp_get_thread_num()];
+#pragma omp for
+        // Iterate over particles and recycle
+        for (int ip_out = 0; ip_out < np_out; ip_out++) {
+            unsigned int ip = rand_r(&s) % np; // Index of particle to recycle
+            double p_inj = (rand_r(&s) / (double)RAND_MAX); // Probability: which injector to use for new particle
+            // std::cout << "thread: " << omp_get_thread_num() << " ip: " << ip << " p_inj: " << p_inj << std::endl;
+            recycleParticle(ip, p_inj);
+        }
+    }
+
+    // ====================
+    // Mixing substep
+    // ====================
+
+    // ====================
+    // Reaction substep
+    // ====================
+
+    // Print status
     print();
 
-    // Reaction substep
-// #pragma omp parallel for
-//     for (Particle& p : pvec) {
-//         p->react(dt);
-//     }
-
+    // Increment
     step++;
     t += dt;
+}
+
+void Reactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
+    int iinj;
+    double flow_sum = 0.0;
+    for (int i = 0; i < injvec.size(); i++) {
+        flow_sum += injvec[i].getFlow();
+        if (p_inj <= flow_sum) {
+            iinj = i;
+            break;
+        }
+    }
+    pvec[ip].seta(0.0);
+    pvec[ip].seth(injvec[iinj].h());
+    pvec[ip].setY(injvec[iinj].Y().data());
+    // std::cout << "Recycling particle " << ip
+    //     << " to injector " << iinj
+    //     << " (p_inj = " << p_inj << ")" << std::endl;
+    // pvec[ip].print();
 }
 
 bool Reactor::runDone() {

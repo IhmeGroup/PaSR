@@ -8,31 +8,32 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated")
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pthread")
 
-set(HOME /Users/mbonanni)
+set(HOME /home/ihme/mbonanni)
+# set(HOME /Users/mbonanni)
 set(UTILITIES_ROOT ${HOME}/local)
 
 find_package(OpenMP)
 
-set(CANTERA_ROOT /opt/homebrew/Caskroom/miniforge/base/envs/cantera_dev)
-# set(CANTERA_ROOT ${UTILITIES_ROOT}/cantera)
-# set(SUNDIALS_ROOT ${UTILITIES_ROOT}/sundials/3.1.0/)
-# set(EIGEN3_ROOT ${UTILITIES_ROOT}/eigen/3.2.9/eigen)
-# set(BOOST_ROOT ${HOME}/tools/boost_1_55_0/installationDir)
+# set(CANTERA_ROOT /opt/homebrew/Caskroom/miniforge/base/envs/cantera_dev)
+set(CANTERA_ROOT ${UTILITIES_ROOT}/cantera)
+set(SUNDIALS_ROOT ${UTILITIES_ROOT}/sundials/3.1.0/)
+set(EIGEN3_ROOT ${UTILITIES_ROOT}/eigen/3.2.9/eigen)
+set(BOOST_ROOT ${HOME}/tools/boost_1_55_0/installationDir)
 
-# include_directories(
-#     ${CANTERA_ROOT}/include
-#     ${SUNDIALS_ROOT}/include
-#     ${EIGEN3_ROOT}/include/eigen
-#     ${BOOST_ROOT}/include)
 include_directories(
-    ${CANTERA_ROOT}/include)
+    ${CANTERA_ROOT}/include
+    ${SUNDIALS_ROOT}/include
+    ${EIGEN3_ROOT}/include/eigen
+    ${BOOST_ROOT}/include)
+# include_directories(
+#     ${CANTERA_ROOT}/include)
+link_directories(
+    ${CANTERA_ROOT}/build/lib
+    ${SUNDIALS_ROOT}/lib
+    ${})
 # link_directories(
 #     ${CANTERA_ROOT}/lib
-#     ${SUNDIALS_ROOT}/lib
 #     ${})
-link_directories(
-    ${CANTERA_ROOT}/lib
-    ${})
 
 add_executable(${TARGET_NAME}
         src/pasr.cpp
@@ -42,21 +43,21 @@ add_executable(${TARGET_NAME}
         src/Particle.h
         src/Injector.cpp
         src/Injector.h)
-# target_link_libraries(${TARGET_NAME})
-# if(OpenMP_CXX_FOUND)
-    # target_link_libraries(
-    #     ${TARGET_NAME}
-    #     PUBLIC
-    #     cantera
-    #     sundials_cvodes
-    #     sundials_ida
-    #     sundials_nvecserial
-    #     OpenMP::OpenMP_CXX)
-# endif()
+target_link_libraries(${TARGET_NAME})
 if(OpenMP_CXX_FOUND)
     target_link_libraries(
         ${TARGET_NAME}
         PUBLIC
         cantera
+        sundials_cvodes
+        sundials_ida
+        sundials_nvecserial
         OpenMP::OpenMP_CXX)
 endif()
+# if(OpenMP_CXX_FOUND)
+#     target_link_libraries(
+#         ${TARGET_NAME}
+#         PUBLIC
+#         cantera
+#         OpenMP::OpenMP_CXX)
+# endif()

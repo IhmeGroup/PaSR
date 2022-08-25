@@ -5,13 +5,18 @@
 class Injector {
 public:
     explicit Injector();
+    explicit Injector(const int& index, const unsigned int& nsp_);
     ~Injector();
 
-    double& T() {
-        return m_T;
+    double& h() {
+        return m_h;
     }
 
-    double* Y() {
+    double& T() {
+        throw Cantera::NotImplementedError("Injector::setT");
+    }
+
+    std::vector<double>& Y() {
         return m_Y;
     }
 
@@ -19,12 +24,29 @@ public:
         return m_Y[k];
     }
 
-    void setnsp(const int& nsp_) {
+    void setIndex(const int& index_) {
+        index = index_;
+    }
+
+    void setnsp(const unsigned int& nsp_) {
         nsp = nsp_;
+        m_Y.resize(nsp);
+    }
+
+    double getFlow() {
+        return flow;
+    }
+
+    void setFlow(const double& flow_) {
+        flow = flow_;
+    }
+
+    void seth(const double& h_) {
+        m_h = h_;
     }
 
     void setT(const double& T_) {
-        m_T = T_;
+        throw Cantera::NotImplementedError("Injector::setT");
     }
 
     void setY(const double* Y_) {
@@ -33,15 +55,19 @@ public:
         }
     }
 
-    void setState(const double& T, const double* Y) {
-        setT(T);
+    void setState(const double& h, const double* Y) {
+        seth(h);
         setY(Y);
     }
 
+    void print();
+
 protected:
-    int nsp;
-    double m_T;
-    double* m_Y;
+    int index;
+    unsigned int nsp;
+    double flow;
+    double m_h;
+    std::vector<double> m_Y;
 
 private:
 
