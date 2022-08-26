@@ -49,20 +49,31 @@ protected:
     bool runDone();
 
     double mean(std::function<double(int)> xfunc, bool favre=true);
+    double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
     double meanState(int iv, bool favre=true);
     void meanState(std::vector<double>* xsumvec, bool favre=true);
 
     double min(std::function<double(int)> xfunc);
+    double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
     double minState(int iv);
     void minState(std::vector<double>* minvec);
 
     double max(std::function<double(int)> xfunc);
+    double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
     double maxState(int iv);
     void maxState(std::vector<double>* maxvec);
 
     double meanAge(bool favre=true);
     double minAge();
     double maxAge();
+
+    double meanT(bool favre=true);
+    double minT();
+    double maxT();
+
+    double meanZ(bool favre=true);
+    double minZ();
+    double maxZ();
 
     std::string mixingModelString(MixingModel mixing_model_) {
         switch(mixing_model_) {

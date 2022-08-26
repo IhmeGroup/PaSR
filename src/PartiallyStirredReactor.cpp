@@ -276,9 +276,18 @@ void PartiallyStirredReactor::check() {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Starting step: " << step << std::endl;
     std::cout << "> t: " << t << std::endl;
-    std::cout << "> a: min = " << minAge() <<
-        ", fmean = " << meanAge(true) <<
-        ", max = " << maxAge() << std::endl;
+    std::cout << "> a: " <<
+        "min = " << minAge() << ",\t" <<
+        "fmean = " << meanAge(true) << ",\t" <<
+        "max = " << maxAge() << std::endl;
+    std::cout << "> T: " <<
+        "min = " << minT() << ",\t" <<
+        "fmean = " << meanT(true) << ",\t" <<
+        "max = " << maxT() << std::endl;
+    std::cout << "> Z: " <<
+        "min = " << minZ() << ",\t" <<
+        "fmean = " << meanZ(true) << ",\t" <<
+        "max = " << maxZ() << std::endl;
 }
 
 void PartiallyStirredReactor::takeStep() {
@@ -453,6 +462,23 @@ double PartiallyStirredReactor::mean(std::function<double(int)> xfunc, bool favr
     return xsum / rhosum;
 }
 
+double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre) {
+    double rhosum = 0.0;
+    double xsum = 0.0;
+#pragma omp parallel for reduction(+:rhosum,xsum)
+    for (int ip = 0; ip < np; ip++) {
+        double rho = 0.0;
+        if (favre) {
+            rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
+        } else {
+            rho = 1.0;
+        }
+        rhosum += rho;
+        xsum += rho * xfunc(gasvec[omp_get_thread_num()], ip);
+    }
+    return xsum / rhosum;
+}
+
 double PartiallyStirredReactor::meanState(int iv, bool favre) {
     double rhosum = 0.0;
     double xsum = 0.0;
@@ -504,6 +530,15 @@ double PartiallyStirredReactor::min(std::function<double(int)> xfunc) {
     return minval;
 }
 
+double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
+    double minval = xfunc(gasvec[0], 0);
+#pragma omp parallel for reduction(min:minval)
+    for (int ip = 0; ip < np; ip++) {
+        minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip));
+    }
+    return minval;
+}
+
 double PartiallyStirredReactor::minState(int iv) {
     double minval = pvec[0].state(iv);
 #pragma omp parallel for reduction(min:minval)
@@ -540,6 +575,15 @@ double PartiallyStirredReactor::max(std::function<double(int)> xfunc) {
 #pragma omp parallel for reduction(max:maxval)
     for (int ip = 0; ip < np; ip++) {
         maxval = std::max(maxval, xfunc(ip));
+    }
+    return maxval;
+}
+
+double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
+    double maxval = xfunc(gasvec[0], 0);
+#pragma omp parallel for reduction(max:maxval)
+    for (int ip = 0; ip < np; ip++) {
+        maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return maxval;
 }
@@ -588,6 +632,42 @@ double PartiallyStirredReactor::minAge() {
 double PartiallyStirredReactor::maxAge() {
     std::function<double(int)> age = [this](int ip) { return pvec[ip].getAge(); };
     return max(age);
+}
+
+double PartiallyStirredReactor::meanT(bool favre) {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> T = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].T(gas); };
+    return mean(T, favre);
+}
+
+double PartiallyStirredReactor::minT() {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> T = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].T(gas); };
+    return min(T);
+}
+
+double PartiallyStirredReactor::maxT() {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> T = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].T(gas); };
+    return max(T);
+}
+
+double PartiallyStirredReactor::meanZ(bool favre) {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> Z = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].Z(gas, comp_fuel, comp_ox); };
+    return mean(Z, favre);
+}
+
+double PartiallyStirredReactor::minZ() {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> Z = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].Z(gas, comp_fuel, comp_ox); };
+    return min(Z);
+}
+
+double PartiallyStirredReactor::maxZ() {
+    std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> Z = 
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) { return pvec[ip].Z(gas, comp_fuel, comp_ox); };
+    return max(Z);
 }
 
 bool PartiallyStirredReactor::runDone() {
