@@ -53,7 +53,7 @@ void PartiallyStirredReactor::parseInput() {
     std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or("FULL_MIX");
     if (mixing_model_str == "NO_MIX") {
         mixing_model = NO_MIX;
-    }else if (mixing_model_str == "FULL_MIX") {
+    } else if (mixing_model_str == "FULL_MIX") {
         mixing_model = FULL_MIX;
     } else if (mixing_model_str == "CURL") {
         mixing_model = CURL;
@@ -133,6 +133,7 @@ void PartiallyStirredReactor::initialize() {
     nv = nsp + 2;
     pvec.resize(np);
     xvec.resize(nv*np);
+    xtemp.resize(nv);
     Y_fuel.resize(nsp);
     Y_ox.resize(nsp);
     Y_phi.resize(nsp);
@@ -242,8 +243,11 @@ void PartiallyStirredReactor::takeStep() {
     }
 
     // Take substeps
+    // for (Particle& p : pvec) p.print();
     subStepInflow();
+    // for (Particle& p : pvec) p.print();
     subStepMix();
+    // for (Particle& p : pvec) p.print();
     subStepReact();
     // for (Particle& p : pvec) p.print();
 
@@ -317,11 +321,11 @@ void PartiallyStirredReactor::subStepMix() {
             break;
         }
         case IEM: {
-            std::vector<double> xmean = favreMeanState();
+            favreMeanState(&xtemp);
             Particle pmean;
             pmean.setnsp(nsp);
-            pmean.setState(xmean.data());
-#pragma omp parallel for
+            pmean.setState(xtemp.data());
+// #pragma omp parallel for
             for (int ip = 0; ip < np; ip++) {
                 pvec[ip] += -(1.0/2.0) * (dt/tau_mix) * (pvec[ip] - pmean);
             }
@@ -373,31 +377,29 @@ void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const doub
     // pvec[ip].print();
 }
 
-std::vector<double> PartiallyStirredReactor::meanState() {
+void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec) {
 
     // Sum across particles
-    std::vector<double> xsumvec(np, 0.0);
-#pragma omp parallel for reduction(vec_double_plus:xsumvec)
+    std::vector<double> xsumvec(xmeanvec->size(), 0.0);
+#pragma omp parallel for reduction(vec_double_plus : xsumvec)
     for (int ip = 0; ip < np; ip++) {
         for (int iv = 0; iv < nv; iv++) {
             xsumvec[iv] += pvec[ip].state(iv);
         }
     }
 
-    // Divide by particle count
-    for (auto& el : xsumvec) {
-        el /= np;
+    // Divide by particle count and write to mean vec
+    for (int iv = 0; iv < nv; iv++) {
+        (*xmeanvec)[iv] = xsumvec[iv] / np;
     }
-
-    return xsumvec;
 }
 
-std::vector<double> PartiallyStirredReactor::favreMeanState() {
+void PartiallyStirredReactor::favreMeanState(std::vector<double>* rhoxmeanvec) {
 
     // Sum across particles
-    std::vector<double> rhoxsumvec(np, 0.0);
+    std::vector<double> rhoxsumvec(rhoxmeanvec->size(), 0.0);
     double rhosum = 0.0;
-#pragma omp parallel for reduction(vec_double_plus:rhoxsumvec)
+#pragma omp parallel for reduction(vec_double_plus : rhoxsumvec)
     for (int ip = 0; ip < np; ip++) {
         double rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
         rhosum += rho;
@@ -407,11 +409,9 @@ std::vector<double> PartiallyStirredReactor::favreMeanState() {
     }
 
     // Divide
-    for (auto& el : rhoxsumvec) {
-        el /= rhosum;
+    for (int iv = 0; iv < nv; iv++) {
+        (*rhoxmeanvec)[iv] = rhoxsumvec[iv] / rhosum;
     }
-
-    return rhoxsumvec;
 }
 
 bool PartiallyStirredReactor::runDone() {

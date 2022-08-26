@@ -143,10 +143,12 @@ public:
     }
 
     void setState(const double* state) {
-        throw Cantera::NotImplementedError("Particle::setState(const double* state)");
+        for (int iv = 0; iv < nv; iv++) {
+            xvec[iv] = state[iv];
+        }
     }
 
-    void print();
+    void print(double threshold = 1.0e-14);
 
     void react(Cantera::ReactorNet* rnet, const double& dt);
 

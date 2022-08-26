@@ -60,7 +60,7 @@ public:
         setY(Y);
     }
 
-    void print();
+    void print(double threshold = 1.0e-14);
 
 protected:
     int index;

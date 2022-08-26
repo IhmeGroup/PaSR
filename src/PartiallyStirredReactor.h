@@ -26,8 +26,8 @@ protected:
     void subStepReact();
     void incrementAge();
     void recycleParticle(const unsigned int& ip, const double& p_inj);
-    std::vector<double> favreMeanState();
-    std::vector<double> meanState();
+    void favreMeanState(std::vector<double>* rhoxsumvec);
+    void meanState(std::vector<double>* xsumvec);
     bool runDone();
 
     std::string mixingModelString(MixingModel mixing_model_) {
@@ -68,6 +68,7 @@ protected:
     unsigned int nsp;
     unsigned int nv;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
+    std::vector<double> xtemp;
 
     std::vector<unsigned int>seedvec;
     double p_out, p_mix;

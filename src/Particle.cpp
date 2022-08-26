@@ -4,13 +4,13 @@ Particle::Particle() {
 
 }
 
-void Particle::print() {
+void Particle::print(double threshold) {
     std::cout << "----------" << std::endl;
     std::cout << "Particle " << index << ":" << std::endl;
     std::cout << "> h: " << h() << std::endl;
     std::cout << "> Y: " << std::endl;
     for (int k = 0; k < nsp; k++) {
-        if (Y(k) > 0.0) {
+        if (Y(k) >= threshold) {
             std::cout << ">   " << k << ": " << Y(k) << std::endl;
         }
     }
