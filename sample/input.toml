@@ -7,6 +7,8 @@ n_steps = 10
 # t_stop = 5.0
 # dt = 1.0e-6
 # dt_sub = 1.0e-7
+convergence_metric = "MEAN"
+rtol = 1.0e-4
 
 [Models]
 mixing_model = "IEM"
@@ -24,3 +26,4 @@ tau_mix = 1.0e-4
 
 [Output]
 check_interval = 2
+check_verbose = false

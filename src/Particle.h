@@ -4,8 +4,8 @@
 #include "cantera/core.h"
 #include "cantera/zerodim.h"
 
-const size_t c_offset_h = 0; // enthalpy
-const size_t c_offset_Y = 1; // mass fraction
+const int c_offset_h = 0; // enthalpy
+const int c_offset_Y = 1; // mass fraction
 
 class Particle {
 public:
