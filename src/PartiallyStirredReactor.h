@@ -9,6 +9,24 @@
 #include "Injector.h"
 #include "Particle.h"
 
+const std::string DEFAULT_MECH_NAME = "";
+const unsigned int DEFAULT_N_PARTICLES = 100;
+const unsigned int DEFAULT_N_STEPS = -1;
+const double DEFAULT_T_STOP = -1.0;
+const double DEFAULT_DT = -1.0;
+const double DEFAULT_DT_SUB = -1.0;
+const std::string DEFAULT_MIX_MODEL = "FULL_MIX";
+const double DEFAULT_PRESSURE = 101325.0;
+const std::string DEFAULT_COMP_FUEL = "";
+const std::string DEFAULT_COMP_OX = "";
+const double DEFAULT_T_FUEL = 300.0;
+const double DEFAULT_T_OX = 300.0;
+const double DEFAULT_T_INIT = 300.0;
+const double DEFAULT_PHI_GLOBAL = 1.0;
+const double DEFAULT_TAU_RES = 1.0;
+const double DEFAULT_TAU_MIX = 1.0;
+const unsigned int DEFAULT_CHECK_INTERVAL = 1;
+
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 
 class PartiallyStirredReactor {
