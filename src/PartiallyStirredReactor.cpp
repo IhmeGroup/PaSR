@@ -231,7 +231,7 @@ void PartiallyStirredReactor::initialize() {
 
 void PartiallyStirredReactor::run() {
     std::cout << "----------" << std::endl;
-    std::cout << "Begin time stepping" << std::endl;
+    std::cout << "Begin time stepping..." << std::endl;
     while (!runDone()) {
         takeStep();
     }
@@ -298,11 +298,16 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
 void PartiallyStirredReactor::subStepMix(double dt) {
     switch(mixing_model) {
         case NO_MIX: {
-            break; // Do nothing
+            // Do nothing
+            break;
         }
         case FULL_MIX: {
-            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
-                                               "FULL_MIX not implemented.");
+            favreMeanState(&xtemp);
+            // Set all particles to Favre mean state
+#pragma omp parallel for
+            for (int ip = 0; ip < np; ip++) {
+                pvec[ip].setState(xtemp.data());
+            }
             break;
         }
         case CURL: {
