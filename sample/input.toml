@@ -8,7 +8,7 @@ n_steps = 3
 dt = 1.0e-6
 
 [Models]
-mixing_model = "MOD_CURL"
+mixing_model = "IEM"
 
 [Conditions]
 pressure = 101325.0

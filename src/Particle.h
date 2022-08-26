@@ -69,12 +69,32 @@ public:
         return age;
     }
 
+    double rho(std::shared_ptr<Cantera::ThermoPhase> gas) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->density();
+    }
+
+    double rho(Cantera::ThermoPhase* gas) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->density();
+    }
+
     double& h() {
         return xvec[c_offset_h];
     }
 
-    double& T() {
-        throw Cantera::NotImplementedError("Particle::T");
+    double T(std::shared_ptr<Cantera::ThermoPhase> gas) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->temperature();
+    }
+
+    double T(Cantera::ThermoPhase* gas) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->temperature();
     }
 
     double* Y() {
@@ -109,10 +129,6 @@ public:
 
     void seth(const double& h) {
         xvec[c_offset_h] = h;
-    }
-
-    void setT(const double& T) {
-        throw Cantera::NotImplementedError("Particle::setT");
     }
 
     void setY(const double* Y) {

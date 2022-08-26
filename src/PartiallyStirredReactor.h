@@ -26,6 +26,7 @@ protected:
     void subStepReact();
     void incrementAge();
     void recycleParticle(const unsigned int& ip, const double& p_inj);
+    std::vector<double> favreMeanState();
     std::vector<double> meanState();
     bool runDone();
 
