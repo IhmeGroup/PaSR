@@ -61,7 +61,7 @@ public:
         return &xvec[0];
     }
 
-    double& state(const int& i) {
+    double& state(int i) {
         return xvec[i];
     }
 
@@ -101,21 +101,21 @@ public:
         return &xvec[c_offset_Y];
     }
 
-    double& Y(const int& k) {
+    double& Y(int k) {
         return xvec[c_offset_Y + k];
     }
 
-    void setIndex(const int& index_) {
+    void setIndex(int index_) {
         index = index_;
     }
 
-    void setnsp(const int& nsp_) {
+    void setnsp(int nsp_) {
         nsp = nsp_;
         nv = nsp + c_offset_Y;
         xvec.resize(nv);
     }
     
-    void setMass(const double& mass_) {
+    void setMass(double mass_) {
         mass = mass_;
     }
 
@@ -123,11 +123,11 @@ public:
         m_P = P_;
     }
 
-    void setAge(const double& age_) {
+    void setAge(double age_) {
         age = age_;
     }
 
-    void seth(const double& h) {
+    void seth(double h) {
         xvec[c_offset_h] = h;
     }
 
@@ -137,7 +137,7 @@ public:
         }
     }
 
-    void setState(const double& h, double* Y) {
+    void setState(double h, const double* Y) {
         seth(h);
         setY(Y);
     }
@@ -150,7 +150,7 @@ public:
 
     void print(double threshold = 1.0e-14);
 
-    void react(Cantera::ReactorNet* rnet, const double& dt);
+    void react(Cantera::ReactorNet* rnet, double dt);
 
 protected:
     int index;

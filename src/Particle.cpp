@@ -17,7 +17,7 @@ void Particle::print(double threshold) {
     std::cout << "----------" << std::endl;
 }
 
-void Particle::react(Cantera::ReactorNet* rnet, const double& dt) {
+void Particle::react(Cantera::ReactorNet* rnet, double dt) {
     Cantera::Reactor* reactor = &rnet->reactor(0);
     Cantera::ThermoPhase* gas = &reactor->contents();
     gas->setState_PY(P(), Y());

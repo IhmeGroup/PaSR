@@ -45,9 +45,12 @@ void PartiallyStirredReactor::parseInput() {
     t_stop = config->get_qualified_as<double>("Numerics.t_stop").value_or(-1.0);
     if (t_stop > 0)
         std::cout << "> Numerics.t_stop = " << t_stop << std::endl;
-    dt = config->get_qualified_as<double>("Numerics.dt").value_or(-1.0);
-    if (dt > 0)
-        std::cout << "> Numerics.dt = " << dt << std::endl;
+    dt_step = config->get_qualified_as<double>("Numerics.dt").value_or(-1.0);
+    if (dt_step > 0)
+        std::cout << "> Numerics.dt = " << dt_step << std::endl;
+    dt_sub_target = config->get_qualified_as<double>("Numerics.dt_sub").value_or(-1.0);
+    if (dt_sub_target > 0)
+        std::cout << "> Numerics.dt_sub = " << dt_sub_target << std::endl;
 
     // Models
     std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or("FULL_MIX");
@@ -101,9 +104,14 @@ void PartiallyStirredReactor::initialize() {
     p_out = 0.0;
     p_mix = 0.0;
 
-    if (dt <= 0.0) {
-        dt = 0.1 * std::min(tau_res, tau_mix);
-        std::cout << "Setting dt automatically: " << dt << std::endl;
+    // Set step sizes
+    if (dt_step <= 0.0) {
+        dt_step = 0.1 * std::min(tau_res, tau_mix);
+        std::cout << "Setting dt automatically: " << dt_step << std::endl;
+    }
+    if (dt_sub_target < 0.0) {
+        dt_sub_target = 0.04 * tau_mix;
+        std::cout << "Setting dt_sub automatically: " << dt_sub_target << std::endl;
     }
 
     // Generate random seed for each thread
@@ -238,18 +246,23 @@ void PartiallyStirredReactor::takeStep() {
     std::cout << "Starting step: " << step << "\tt: " << t << std::endl;
 
     // Adjust time step
-    if ((t_stop > 0) && ((t + dt) > t_stop)) {
-        dt = t_stop - t;
+    if ((t_stop > 0) && ((t + dt_step) > t_stop)) {
+        dt_step = t_stop - t;
     }
+
+    int n_substeps = 1 + round(dt_step / dt_sub_target);
+    double dt_sub = dt_step / n_substeps;
 
     // Take substeps
     // for (Particle& p : pvec) p.print();
-    subStepInflow();
+    subStepInflow(dt_step);
     // for (Particle& p : pvec) p.print();
-    subStepMix();
-    // for (Particle& p : pvec) p.print();
-    subStepReact();
-    // for (Particle& p : pvec) p.print();
+    for (int isub = 0; isub < n_substeps; isub++) {
+        subStepMix(dt_sub);
+        // for (Particle& p : pvec) p.print();
+        subStepReact(dt_sub);
+        // for (Particle& p : pvec) p.print();
+    }
 
     incrementAge();
 
@@ -258,10 +271,10 @@ void PartiallyStirredReactor::takeStep() {
 
     // Increment counters
     step++;
-    t += dt;
+    t += dt_step;
 }
 
-void PartiallyStirredReactor::subStepInflow() {
+void PartiallyStirredReactor::subStepInflow(double dt) {
     p_out += np * dt / tau_res; // Fractional particle count to recycle
     int np_out = round(p_out); // Round to integer
     p_out -= np_out; // Hold on to remainder for next step
@@ -282,7 +295,7 @@ void PartiallyStirredReactor::subStepInflow() {
     }
 }
 
-void PartiallyStirredReactor::subStepMix() {
+void PartiallyStirredReactor::subStepMix(double dt) {
     switch(mixing_model) {
         case NO_MIX: {
             break; // Do nothing
@@ -325,7 +338,7 @@ void PartiallyStirredReactor::subStepMix() {
             Particle pmean;
             pmean.setnsp(nsp);
             pmean.setState(xtemp.data());
-// #pragma omp parallel for
+#pragma omp parallel for
             for (int ip = 0; ip < np; ip++) {
                 pvec[ip] += -(1.0/2.0) * (dt/tau_mix) * (pvec[ip] - pmean);
             }
@@ -343,7 +356,7 @@ void PartiallyStirredReactor::subStepMix() {
     }
 }
 
-void PartiallyStirredReactor::subStepReact() {
+void PartiallyStirredReactor::subStepReact(double dt) {
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
         // Use the current thread's reactor for calculation
@@ -354,11 +367,11 @@ void PartiallyStirredReactor::subStepReact() {
 void PartiallyStirredReactor::incrementAge() {
 #pragma omp parallel for
     for (int ip = 0; ip < np; ip++) {
-        pvec[ip].getAge() += dt;
+        pvec[ip].getAge() += dt_step;
     }
 }
 
-void PartiallyStirredReactor::recycleParticle(const unsigned int& ip, const double& p_inj) {
+void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj) {
     int iinj;
     double flow_sum = 0.0;
     for (int i = 0; i < injvec.size(); i++) {

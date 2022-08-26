@@ -21,11 +21,11 @@ public:
 protected:
     void parseInput();
     void takeStep();
-    void subStepInflow();
-    void subStepMix();
-    void subStepReact();
+    void subStepInflow(double dt);
+    void subStepMix(double dt);
+    void subStepReact(double dt);
     void incrementAge();
-    void recycleParticle(const unsigned int& ip, const double& p_inj);
+    void recycleParticle(unsigned int ip, double p_inj);
     void favreMeanState(std::vector<double>* rhoxsumvec);
     void meanState(std::vector<double>* xsumvec);
     bool runDone();
@@ -45,8 +45,10 @@ protected:
     std::string mech_filename;
     unsigned int np;
     int n_steps;
+    int n_substeps;
     double t_stop;
-    double dt;
+    double dt_step;
+    double dt_sub_target;
     double t;
     unsigned int step;
     MixingModel mixing_model;
