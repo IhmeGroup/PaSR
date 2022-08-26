@@ -18,6 +18,30 @@
             std::plus<double>())) \
     initializer( \
         omp_priv = decltype(omp_orig)(omp_orig.size()))
+#pragma omp declare \
+    reduction( \
+        vec_double_min : \
+        std::vector<double> : \
+        std::transform( \
+            omp_out.begin(), \
+            omp_out.end(), \
+            omp_in.begin(), \
+            omp_out.begin(), \
+            [](double x1, double x2) { return std::min(x1, x2); })) \
+    initializer( \
+        omp_priv = decltype(omp_orig)(omp_orig.size()))
+#pragma omp declare \
+    reduction( \
+        vec_double_max : \
+        std::vector<double> : \
+        std::transform( \
+            omp_out.begin(), \
+            omp_out.end(), \
+            omp_in.begin(), \
+            omp_out.begin(), \
+            [](double x1, double x2) { return std::max(x1, x2); })) \
+    initializer( \
+        omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
@@ -29,7 +53,7 @@ PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filena
 void PartiallyStirredReactor::parseInput() {
     auto config = cpptoml::parse_file(input_filename);
 
-    std::cout << "----------" << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Input file parameters:" << std::endl;
 
     // Mechanism
@@ -95,7 +119,11 @@ void PartiallyStirredReactor::parseInput() {
     tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(1.0);
     std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
 
-    std::cout << "----------" << std::endl;
+    // Output
+    check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(1);
+    std::cout << "> Output.check_interval = " << check_interval << std::endl;
+
+    std::cout << "--------------------------------------------------" << std::endl;
 }
 
 void PartiallyStirredReactor::initialize() {
@@ -199,9 +227,11 @@ void PartiallyStirredReactor::initialize() {
         pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
         // if (ip <= (np-1) / 2.0) {
+        //     pvec[ip].setAge(0.0);
         //     pvec[ip].seth(h_fuel);
         //     pvec[ip].setY(Y_fuel.data());
         // } else {
+        //     pvec[ip].setAge(1.0);
         //     pvec[ip].seth(h_ox);
         //     pvec[ip].setY(Y_ox.data());
         // }
@@ -230,7 +260,7 @@ void PartiallyStirredReactor::initialize() {
 }
 
 void PartiallyStirredReactor::run() {
-    std::cout << "----------" << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Begin time stepping..." << std::endl;
     while (!runDone()) {
         takeStep();
@@ -242,8 +272,22 @@ void PartiallyStirredReactor::print() {
     
 }
 
+void PartiallyStirredReactor::check() {
+    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "Starting step: " << step << std::endl;
+    std::cout << "> t: " << t << std::endl;
+    std::cout << "> a: min = " << minAge() <<
+        ", fmean = " << meanAge(true) <<
+        ", max = " << maxAge() << std::endl;
+}
+
 void PartiallyStirredReactor::takeStep() {
-    std::cout << "Starting step: " << step << "\tt: " << t << std::endl;
+    // Print status
+    if (check_interval > 0) {
+        if ((step % check_interval) == 0) {
+            check();
+        }
+    }
 
     // Adjust time step
     if ((t_stop > 0) && ((t + dt_step) > t_stop)) {
@@ -264,12 +308,8 @@ void PartiallyStirredReactor::takeStep() {
         // for (Particle& p : pvec) p.print();
     }
 
-    incrementAge();
-
-    // Print status
-    print();
-
     // Increment counters
+    incrementAge();
     step++;
     t += dt_step;
 }
@@ -302,7 +342,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case FULL_MIX: {
-            favreMeanState(&xtemp);
+            meanState(&xtemp, true);
             // Set all particles to Favre mean state
 #pragma omp parallel for
             for (int ip = 0; ip < np; ip++) {
@@ -316,6 +356,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case MOD_CURL: {
+            // TODO - currently assumes equal weight particles
             // Compute how many pairs to mix
             p_mix += np * dt / tau_mix;
             int np_mix = round(p_mix);
@@ -339,7 +380,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case IEM: {
-            favreMeanState(&xtemp);
+            meanState(&xtemp, true);
             Particle pmean;
             pmean.setnsp(nsp);
             pmean.setState(xtemp.data());
@@ -395,41 +436,158 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj) {
     // pvec[ip].print();
 }
 
-void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec) {
+double PartiallyStirredReactor::mean(std::function<double(int)> xfunc, bool favre) {
+    double rhosum = 0.0;
+    double xsum = 0.0;
+#pragma omp parallel for reduction(+:rhosum,xsum)
+    for (int ip = 0; ip < np; ip++) {
+        double rho = 0.0;
+        if (favre) {
+            rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
+        } else {
+            rho = 1.0;
+        }
+        rhosum += rho;
+        xsum += rho * xfunc(ip);
+    }
+    return xsum / rhosum;
+}
+
+double PartiallyStirredReactor::meanState(int iv, bool favre) {
+    double rhosum = 0.0;
+    double xsum = 0.0;
+#pragma omp parallel for reduction(+:rhosum,xsum)
+    for (int ip = 0; ip < np; ip++) {
+        double rho = 0.0;
+        if (favre) {
+            rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
+        } else {
+            rho = 1.0;
+        }
+        rhosum += rho;
+        xsum += rho * pvec[ip].state(iv);
+    }
+    return xsum / rhosum;
+}
+
+void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool favre) {
 
     // Sum across particles
     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
-#pragma omp parallel for reduction(vec_double_plus : xsumvec)
+    double rhosum = 0.0;
+#pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
     for (int ip = 0; ip < np; ip++) {
+        double rho;
+        if (favre) {
+            rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
+        } else {
+            rho = 1.0;
+        }
+        rhosum += rho;
         for (int iv = 0; iv < nv; iv++) {
-            xsumvec[iv] += pvec[ip].state(iv);
+            xsumvec[iv] += rho * pvec[ip].state(iv);
         }
     }
 
     // Divide by particle count and write to mean vec
     for (int iv = 0; iv < nv; iv++) {
-        (*xmeanvec)[iv] = xsumvec[iv] / np;
+        (*xmeanvec)[iv] = xsumvec[iv] / rhosum;
     }
 }
 
-void PartiallyStirredReactor::favreMeanState(std::vector<double>* rhoxmeanvec) {
-
-    // Sum across particles
-    std::vector<double> rhoxsumvec(rhoxmeanvec->size(), 0.0);
-    double rhosum = 0.0;
-#pragma omp parallel for reduction(vec_double_plus : rhoxsumvec)
+double PartiallyStirredReactor::min(std::function<double(int)> xfunc) {
+    double minval = xfunc(0);
+#pragma omp parallel for reduction(min:minval)
     for (int ip = 0; ip < np; ip++) {
-        double rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
-        rhosum += rho;
+        minval = std::min(minval, xfunc(ip));
+    }
+    return minval;
+}
+
+double PartiallyStirredReactor::minState(int iv) {
+    double minval = pvec[0].state(iv);
+#pragma omp parallel for reduction(min:minval)
+    for (int ip = 0; ip < np; ip++) {
+        minval = std::min(minval, pvec[ip].state(iv));
+    }
+    return minval;
+}
+
+void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
+
+    // Initialize min with first particle
+    std::vector<double> minvec_temp(minvec->size());
+    for (int iv = 0; iv < nv; iv++) {
+        minvec_temp[iv] = pvec[0].state(iv);
+    }
+
+    // Min across particles
+#pragma omp parallel for reduction(vec_double_min:minvec_temp)
+    for (int ip = 0; ip < np; ip++) {
         for (int iv = 0; iv < nv; iv++) {
-            rhoxsumvec[iv] += rho * pvec[ip].state(iv);
+            minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
         }
     }
 
-    // Divide
+    // Write to minvec
     for (int iv = 0; iv < nv; iv++) {
-        (*rhoxmeanvec)[iv] = rhoxsumvec[iv] / rhosum;
+        (*minvec)[iv] = minvec_temp[iv];
     }
+}
+
+double PartiallyStirredReactor::max(std::function<double(int)> xfunc) {
+    double maxval = xfunc(0);
+#pragma omp parallel for reduction(max:maxval)
+    for (int ip = 0; ip < np; ip++) {
+        maxval = std::max(maxval, xfunc(ip));
+    }
+    return maxval;
+}
+
+double PartiallyStirredReactor::maxState(int iv) {
+    double maxval = pvec[0].state(iv);
+#pragma omp parallel for reduction(max:maxval)
+    for (int ip = 0; ip < np; ip++) {
+        maxval = std::max(maxval, pvec[ip].state(iv));
+    }
+    return maxval;
+}
+
+void PartiallyStirredReactor::maxState(std::vector<double>* maxvec) {
+
+    // Initialize max with first particle
+    std::vector<double> maxvec_temp(maxvec->size());
+    for (int iv = 0; iv < nv; iv++) {
+        maxvec_temp[iv] = pvec[0].state(iv);
+    }
+
+    // Max across particles
+#pragma omp parallel for reduction(vec_double_max:maxvec_temp)
+    for (int ip = 0; ip < np; ip++) {
+        for (int iv = 0; iv < nv; iv++) {
+            maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
+        }
+    }
+
+    // Write to maxvec
+    for (int iv = 0; iv < nv; iv++) {
+        (*maxvec)[iv] = maxvec_temp[iv];
+    }
+}
+
+double PartiallyStirredReactor::meanAge(bool favre) {
+    std::function<double(int)> age = [this](int ip) { return pvec[ip].getAge(); };
+    return mean(age, favre);
+}
+
+double PartiallyStirredReactor::minAge() {
+    std::function<double(int)> age = [this](int ip) { return pvec[ip].getAge(); };
+    return min(age);
+}
+
+double PartiallyStirredReactor::maxAge() {
+    std::function<double(int)> age = [this](int ip) { return pvec[ip].getAge(); };
+    return max(age);
 }
 
 bool PartiallyStirredReactor::runDone() {

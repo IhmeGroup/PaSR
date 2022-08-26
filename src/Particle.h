@@ -69,6 +69,18 @@ public:
         return age;
     }
 
+    double& h() {
+        return xvec[c_offset_h];
+    }
+
+    double* Y() {
+        return &xvec[c_offset_Y];
+    }
+
+    double& Y(int k) {
+        return xvec[c_offset_Y + k];
+    }
+
     double rho(std::shared_ptr<Cantera::ThermoPhase> gas) {
         gas->setState_PY(P(), Y());
         gas->setState_HP(h(), P());
@@ -79,10 +91,6 @@ public:
         gas->setState_PY(P(), Y());
         gas->setState_HP(h(), P());
         return gas->density();
-    }
-
-    double& h() {
-        return xvec[c_offset_h];
     }
 
     double T(std::shared_ptr<Cantera::ThermoPhase> gas) {
@@ -97,12 +105,20 @@ public:
         return gas->temperature();
     }
 
-    double* Y() {
-        return &xvec[c_offset_Y];
+    double Z(std::shared_ptr<Cantera::ThermoPhase> gas,
+             const std::string& comp_fuel,
+             const std::string& comp_ox) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
-    double& Y(int k) {
-        return xvec[c_offset_Y + k];
+    double Z(Cantera::ThermoPhase* gas,
+             const std::string& comp_fuel,
+             const std::string& comp_ox) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+        return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
     void setIndex(int index_) {

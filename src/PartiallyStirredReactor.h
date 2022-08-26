@@ -1,6 +1,7 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <functional>
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/core.h"
@@ -17,6 +18,7 @@ public:
     void initialize();
     void run();
     void print();
+    void check();
 
 protected:
     void parseInput();
@@ -26,9 +28,23 @@ protected:
     void subStepReact(double dt);
     void incrementAge();
     void recycleParticle(unsigned int ip, double p_inj);
-    void favreMeanState(std::vector<double>* rhoxsumvec);
-    void meanState(std::vector<double>* xsumvec);
     bool runDone();
+
+    double mean(std::function<double(int)> xfunc, bool favre=true);
+    double meanState(int iv, bool favre=true);
+    void meanState(std::vector<double>* xsumvec, bool favre=true);
+
+    double min(std::function<double(int)> xfunc);
+    double minState(int iv);
+    void minState(std::vector<double>* minvec);
+
+    double max(std::function<double(int)> xfunc);
+    double maxState(int iv);
+    void maxState(std::vector<double>* maxvec);
+
+    double meanAge(bool favre=true);
+    double minAge();
+    double maxAge();
 
     std::string mixingModelString(MixingModel mixing_model_) {
         switch(mixing_model_) {
@@ -74,6 +90,8 @@ protected:
 
     std::vector<unsigned int>seedvec;
     double p_out, p_mix;
+
+    unsigned int check_interval;
 
 private:
     
