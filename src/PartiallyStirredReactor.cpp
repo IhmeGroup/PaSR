@@ -99,12 +99,20 @@ void PartiallyStirredReactor::initialize() {
     step = 0;
     t = 0.0;
     p_out = 0.0;
+    p_mix = 0.0;
 
     if (dt <= 0.0) {
         dt = 0.1 * std::min(tau_res, tau_mix);
         std::cout << "Setting dt automatically: " << dt << std::endl;
     }
 
+    // Generate random seed for each thread
+    seedvec.resize(omp_get_max_threads());
+    for (unsigned int& seed : seedvec) {
+        seed = rand();
+    }
+
+    // Initialize ReactorNet for each thread
     std::cout << "Initializing ReactorNet for each thread..." << std::endl;
     solvec.resize(omp_get_max_threads());
     gasvec.resize(omp_get_max_threads());
@@ -181,6 +189,13 @@ void PartiallyStirredReactor::initialize() {
         pvec[ip].setAge(0.0);
         pvec[ip].seth(h_equil);
         pvec[ip].setY(Y_equil.data());
+        // if (ip <= (np-1) / 2.0) {
+        //     pvec[ip].seth(h_fuel);
+        //     pvec[ip].setY(Y_fuel.data());
+        // } else {
+        //     pvec[ip].seth(h_ox);
+        //     pvec[ip].setY(Y_ox.data());
+        // }
         // pvec[ip].print();
     }
     std::cout << "Done initializing particles." << std::endl;
@@ -247,25 +262,20 @@ void PartiallyStirredReactor::subStepInflow() {
     int np_out = round(p_out); // Round to integer
     p_out -= np_out; // Hold on to remainder for next step
 
-    // Generate random seed for each thread
-    std::vector<int> seedvec(omp_get_max_threads());
-    for (int& seed : seedvec) {
-        seed = rand();
-    }
-
-    unsigned int s;
+    unsigned int* s;
 #pragma omp parallel private(s)
     {
         // Grab this thread's seed
-        s = seedvec[omp_get_thread_num()];
+        s = &seedvec[omp_get_thread_num()];
 #pragma omp for
         // Iterate over particles and recycle
         for (int ip_out = 0; ip_out < np_out; ip_out++) {
-            unsigned int ip = rand_r(&s) % np; // Index of particle to recycle
-            double p_inj = (rand_r(&s) / (double)RAND_MAX); // Probability: which injector to use for new particle
+            unsigned int ip = rand_r(s) % np; // Index of particle to recycle
+            double p_inj = (rand_r(s) / (double)RAND_MAX); // Probability: which injector to use for new particle
             // std::cout << "thread: " << omp_get_thread_num() << " ip: " << ip << " p_inj: " << p_inj << std::endl;
             recycleParticle(ip, p_inj);
         }
+        s++;
     }
 }
 
@@ -275,22 +285,56 @@ void PartiallyStirredReactor::subStepMix() {
             break; // Do nothing
         }
         case FULL_MIX: {
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
+                                               "FULL_MIX not implemented.");
             break;
         }
         case CURL: {
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
+                                               "CURL not implemented.");
             break;
         }
         case MOD_CURL: {
+
+            // Compute how many pairs to mix
+            p_mix += np * dt / tau_mix;
+            int np_mix = round(p_mix);
+            p_mix -= np_mix;
+
+            unsigned int* s;
+#pragma omp parallel private(s)
+            {
+                // Grab this thread's seed
+                s = &seedvec[omp_get_thread_num()];
+#pragma omp for
+                // Iterate over pairs and mix
+                for (int ipair = 0; ipair < np_mix; ipair++) {
+                    unsigned int ip1 = rand_r(s) % np;
+                    unsigned int ip2 = rand_r(s) % np;
+                    double a = (rand_r(s) / (double)RAND_MAX);
+                    pvec[ip1] += (1.0/2.0) * a * (pvec[ip2] - pvec[ip1]);
+                    pvec[ip2] += (1.0/2.0) * a * (pvec[ip1] - pvec[ip2]);
+                    // pvec[ip1].print();
+                    // pvec[ip2].print();
+                }
+                s++;
+            }
+
             break;
         }
         case IEM: {
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
+                                               "IEM not implemented.");
             break;
         }
         case EMST: {
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
+                                               "EMST not implemented.");
             break;
         }
         default: {
-            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix");
+            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
+                                               "Invalid mixing model.");
         }
     }
 }

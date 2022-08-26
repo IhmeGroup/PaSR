@@ -12,17 +12,46 @@ public:
     explicit Particle();
     ~Particle();
 
-    // Particle operator+= (const Particle& rhs)& {
-    //     for (int iv = 0; iv < nv; iv++) {
-    //         state(iv) += rhs.state(iv);
-    //     }
-    //     return *this;
-    // }
+    Particle operator+= (const Particle& rhs)& {
+        for (int iv = 0; iv < nv; iv++) {
+            xvec[iv] += rhs.xvec[iv];
+        }
+        return *this;
+    }
 
-    // friend Particle operator+ (Particle lhs, const Particle& rhs) {
-    //     lhs += rhs;
-    //     return lhs;
-    // }
+    friend Particle operator+ (Particle lhs, const Particle& rhs) {
+        lhs += rhs;
+        return lhs;
+    }
+
+    Particle operator-= (const Particle& rhs)& {
+        for (int iv = 0; iv < nv; iv++) {
+            xvec[iv] -= rhs.xvec[iv];
+        }
+        return *this;
+    }
+
+    friend Particle operator- (Particle lhs, const Particle& rhs) {
+        lhs -= rhs;
+        return lhs;
+    }
+
+    Particle operator*= (const double& rhs)& {
+        for (int iv = 0; iv < nv; iv++) {
+            xvec[iv] *= rhs;
+        }
+        return *this;
+    }
+
+    friend Particle operator* (Particle lhs, const double& rhs) {
+        lhs *= rhs;
+        return lhs;
+    }
+
+    friend Particle operator* (const double& lhs, Particle rhs) {
+        rhs *= lhs;
+        return rhs;
+    }
 
     double& P() {
         return *m_P;

@@ -68,7 +68,8 @@ protected:
     unsigned int nv;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
 
-    double p_out;
+    std::vector<unsigned int>seedvec;
+    double p_out, p_mix;
 
 private:
     

@@ -2,13 +2,13 @@
 name = "./gri30.yaml"
 
 [Numerics]
-n_particles = 1000
-n_steps = 10
+n_particles = 2
+n_steps = 3
 # t_stop = 5.0
 dt = 1.0e-6
 
 [Models]
-mixing_model = "IEM"
+mixing_model = "MOD_CURL"
 
 [Conditions]
 pressure = 101325.0
@@ -19,4 +19,4 @@ T_ox = 1200.0
 T_init = 1500.0
 phi_global = 1.0
 tau_res = 1.0e-3
-tau_mix = 1.0e-4
+tau_mix = 1.0e-8
