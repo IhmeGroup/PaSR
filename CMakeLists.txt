@@ -37,12 +37,15 @@ link_directories(
 
 add_executable(${TARGET_NAME}
         src/pasr.cpp
-        src/PartiallyStirredReactor.cpp
+        src/common.h
         src/PartiallyStirredReactor.h
-        src/Particle.cpp
+        src/PartiallyStirredReactor.cpp
         src/Particle.h
+        src/Particle.cpp
+        src/Injector.h
         src/Injector.cpp
-        src/Injector.h)
+        src/Histogram.h
+        src/Histogram.cpp)
 target_link_libraries(${TARGET_NAME})
 if(OpenMP_CXX_FOUND)
     target_link_libraries(

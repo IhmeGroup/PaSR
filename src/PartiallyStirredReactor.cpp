@@ -1,48 +1,12 @@
-#include <math.h>
+#include <cmath>
 #include <limits>
 #include <algorithm>
 #include <omp.h>
 
 #include "../cpptoml/include/cpptoml.h"
 
+#include "common.h"
 #include "PartiallyStirredReactor.h"
-
-#pragma omp declare \
-    reduction( \
-        vec_double_min : \
-        std::vector<double> : \
-        std::transform( \
-            omp_out.begin(), \
-            omp_out.end(), \
-            omp_in.begin(), \
-            omp_out.begin(), \
-            [](double x1, double x2) { return std::min(x1, x2); })) \
-    initializer( \
-        omp_priv = decltype(omp_orig)(omp_orig.size()))
-#pragma omp declare \
-    reduction( \
-        vec_double_max : \
-        std::vector<double> : \
-        std::transform( \
-            omp_out.begin(), \
-            omp_out.end(), \
-            omp_in.begin(), \
-            omp_out.begin(), \
-            [](double x1, double x2) { return std::max(x1, x2); })) \
-    initializer( \
-        omp_priv = decltype(omp_orig)(omp_orig.size()))
-#pragma omp declare \
-    reduction( \
-        vec_double_plus : \
-        std::vector<double> : \
-        std::transform( \
-            omp_out.begin(), \
-            omp_out.end(), \
-            omp_in.begin(), \
-            omp_out.begin(), \
-            std::plus<double>())) \
-    initializer( \
-        omp_priv = decltype(omp_orig)(omp_orig.size()))
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
@@ -375,7 +339,7 @@ void PartiallyStirredReactor::takeStep() {
         dt_step = t_stop - t;
     }
 
-    int n_substeps = 1 + round(dt_step / dt_sub_target);
+    int n_substeps = 1 + std::round(dt_step / dt_sub_target);
     double dt_sub = dt_step / n_substeps;
 
     // Take substeps
@@ -399,7 +363,7 @@ void PartiallyStirredReactor::takeStep() {
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
     p_out += np * dt / tau_res; // Fractional particle count to recycle
-    int np_out = round(p_out); // Round to integer
+    int np_out = std::round(p_out); // Round to integer
     p_out -= np_out; // Hold on to remainder for next step
 
     unsigned int* s;
@@ -442,7 +406,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             // TODO - currently assumes equal weight particles
             // Compute how many pairs to mix
             p_mix += np * dt / tau_mix;
-            int np_mix = round(p_mix);
+            int np_mix = std::round(p_mix);
             p_mix -= np_mix;
             unsigned int* s;
 #pragma omp parallel private(s)
