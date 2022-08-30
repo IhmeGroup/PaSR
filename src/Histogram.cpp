@@ -60,6 +60,7 @@ void Histogram::generateHist(int n_bins_) {
 }
 
 void Histogram::generatePDF() {
+    pdf.resize(n_bins);
     double total = bin_width * n_data;
 // #pragma omp parallel for
     for (int ib = 0; ib < n_bins; ib++) {
@@ -68,8 +69,10 @@ void Histogram::generatePDF() {
 }
 
 void Histogram::generateCDF() {
+    cdf.resize(n_bins+1);
     cdf[0] = 0.0;
-    for (int ib = 0; ib < n_bins-1; ib++) {
+// #pragma omp parallel for
+    for (int ib = 0; ib < n_bins; ib++) {
         cdf[ib+1] = cdf[ib] + bin_width * pdf[ib];
     }
 }
@@ -77,7 +80,18 @@ void Histogram::generateCDF() {
 double Histogram::rand(std::uniform_real_distribution<double>& uni_real,
                        std::mt19937& eng) {
     double x_uni = uni_real(eng);
-    return x_uni;
+    for (int ib = 0; ib < n_bins; ib++) {
+        if (x_uni < cdf[ib]) {
+            continue;
+        } else if (x_uni >= cdf[ib+1]) {
+            continue;
+        } else {
+            return bin_edges[ib] + (x_uni - cdf[ib]) *
+                (bin_edges[ib+1] - bin_edges[ib]) / (cdf[ib+1] - cdf[ib]);
+        }
+    }
+    // Should never get here
+    throw std::runtime_error("Invalid seed number. Distribution must have limits [0, 1).");
 }
 
 double Histogram::min() {
