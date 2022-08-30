@@ -2,6 +2,7 @@
 #include <string>
 #include <vector>
 #include <functional>
+#include <random>
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/core.h"
@@ -148,7 +149,10 @@ protected:
 
     std::vector<unsigned int> i_fuel;
     std::vector<unsigned int> iv_check;
-    std::vector<unsigned int> seedvec;
+
+    std::vector<std::uniform_int_distribution<unsigned int>> dists_uni_int;
+    std::vector<std::uniform_real_distribution<double>> dists_uni_real;
+    std::vector<std::mt19937> rand_engines;
     double p_out, p_mix;
 
     unsigned int check_interval;

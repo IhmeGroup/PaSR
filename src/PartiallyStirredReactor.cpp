@@ -1,6 +1,7 @@
 #include <cmath>
 #include <limits>
 #include <algorithm>
+#include <chrono>
 #include <omp.h>
 
 #include "../cpptoml/include/cpptoml.h"
@@ -132,10 +133,15 @@ void PartiallyStirredReactor::initialize() {
         std::cout << "Setting dt_sub automatically: " << dt_sub_target << std::endl;
     }
 
-    // Generate random seed for each thread
-    seedvec.resize(omp_get_max_threads());
-    for (unsigned int& seed : seedvec) {
-        seed = rand();
+    // Create distributions and random engines for each thread
+    for (int it = 0; it < omp_get_max_threads(); it++) {
+        std::uniform_int_distribution<unsigned int> uni_int(0, np);
+        std::uniform_real_distribution<double> uni_real(0, 1);
+        std::mt19937 eng((it + 1) * static_cast<uint64_t>(
+            std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+        dists_uni_int.push_back(uni_int);
+        dists_uni_real.push_back(uni_real);
+        rand_engines.push_back(eng);
     }
 
     // Initialize ReactorNet for each thread
@@ -366,19 +372,16 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
     int np_out = std::round(p_out); // Round to integer
     p_out -= np_out; // Hold on to remainder for next step
 
-    unsigned int* s;
-#pragma omp parallel private(s)
+#pragma omp parallel
     {
-        // Grab this thread's seed
-        s = &seedvec[omp_get_thread_num()];
+        int tid = omp_get_thread_num();
 #pragma omp for
         // Iterate over particles and recycle
         for (int ip_out = 0; ip_out < np_out; ip_out++) {
-            unsigned int ip = rand_r(s) % np; // Index of particle to recycle
-            double p_inj = (rand_r(s) / (double)RAND_MAX); // Probability: which injector to use for new particle
+            unsigned int ip = dists_uni_int[tid](rand_engines[tid]); // Index of particle to recycle
+            double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
             recycleParticle(ip, p_inj);
         }
-        s++;
     }
 }
 
@@ -408,21 +411,18 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             p_mix += np * dt / tau_mix;
             int np_mix = std::round(p_mix);
             p_mix -= np_mix;
-            unsigned int* s;
-#pragma omp parallel private(s)
+#pragma omp parallel
             {
-                // Grab this thread's seed
-                s = &seedvec[omp_get_thread_num()];
+                int tid = omp_get_thread_num();
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
-                    unsigned int ip1 = rand_r(s) % np;
-                    unsigned int ip2 = rand_r(s) % np;
-                    double a = (rand_r(s) / (double)RAND_MAX);
+                    unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
+                    unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
+                    double a = dists_uni_real[tid](rand_engines[tid]);
                     pvec[ip1] += (1.0/2.0) * a * (pvec[ip2] - pvec[ip1]);
                     pvec[ip2] += (1.0/2.0) * a * (pvec[ip1] - pvec[ip2]);
                 }
-                s++;
             }
             break;
         }
