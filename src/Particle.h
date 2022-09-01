@@ -1,8 +1,9 @@
 #include <iostream>
 
 #include "cantera/base/ctexceptions.h"
-#include "cantera/core.h"
-#include "cantera/zerodim.h"
+#include "cantera/base/Solution.h"
+#include "cantera/thermo/ThermoPhase.h"
+#include "cantera/zeroD/ReactorNet.h"
 
 const int c_offset_h = 0; // enthalpy
 const int c_offset_Y = 1; // mass fraction

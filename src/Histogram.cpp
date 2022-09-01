@@ -1,3 +1,6 @@
+#include <fstream>
+#include <sstream>
+#include <string>
 #include <cmath>
 #include <random>
 #include <chrono>
@@ -6,8 +9,89 @@
 #include "common.h"
 #include "Histogram.h"
 
-Histogram::Histogram() {
+Histogram::Histogram() :
+    n_data(0), n_bins(0)
+{
 
+}
+
+void Histogram::clear() {
+    n_bins = 0;
+    n_data = 0;
+    data.clear();
+    bin_edges.clear();
+}
+
+void Histogram::printHist() {
+    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "Histogram" << std::endl;
+    std::cout << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "Bin Start" <<
+        std::left << std::setw(COL_WIDTH) << "Bin Stop" <<
+        std::left << std::setw(COL_WIDTH) << "Count" << std::endl;
+    for (int ib = 0; ib < n_bins; ib++) {
+        std::cout <<
+            std::left << std::setw(COL_WIDTH) << bin_edges[ib] << 
+            std::left << std::setw(COL_WIDTH) << bin_edges[ib+1] <<
+            std::left << std::setw(COL_WIDTH) << counts[ib] << std::endl;
+    }
+    std::cout << "--------------------------------------------------" << std::endl;
+}
+
+void Histogram::printPDF() {
+    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "Histogram" << std::endl;
+    std::cout << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "Bin Start" <<
+        std::left << std::setw(COL_WIDTH) << "Bin Stop" <<
+        std::left << std::setw(COL_WIDTH) << "PDF" << std::endl;
+    for (int ib = 0; ib < n_bins; ib++) {
+        std::cout <<
+            std::left << std::setw(COL_WIDTH) << bin_edges[ib] << 
+            std::left << std::setw(COL_WIDTH) << bin_edges[ib+1] <<
+            std::left << std::setw(COL_WIDTH) << pdf[ib] << std::endl;
+    }
+    std::cout << "--------------------------------------------------" << std::endl;
+
+}
+
+void Histogram::printCDF() {
+    std::cout << "--------------------------------------------------" << std::endl;
+    std::cout << "Histogram" << std::endl;
+    std::cout << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "Value" <<
+        std::left << std::setw(COL_WIDTH) << "CDF" << std::endl;
+    for (int ib = 0; ib < n_bins+1; ib++) {
+        std::cout <<
+            std::left << std::setw(COL_WIDTH) << bin_edges[ib] << 
+            std::left << std::setw(COL_WIDTH) << cdf[ib] << std::endl;
+    }
+    std::cout << "--------------------------------------------------" << std::endl;
+
+}
+
+void Histogram::readHist(std::string hist_filename) {
+    clear();
+    std::string line, word;
+    std::fstream file(hist_filename, std::ios::in);
+    if (file.is_open()) {
+        while (getline(file, line)) {
+            std::stringstream str(line);
+
+            std::getline(str, word, ',');
+            bin_edges.push_back(std::stod(word));
+
+            if (std::getline(str, word, ',')) {
+                counts.push_back(std::stod(word));
+                n_bins++;
+            }
+        }
+    } else {
+        std::runtime_error("Histogram::readHist - could not open " + hist_filename + ".");
+    }
 }
 
 void Histogram::generate(int n_bins_) {
@@ -30,7 +114,7 @@ void Histogram::generateHist(int n_bins_) {
     counts.resize(n_bins);
 
     // Min and max element are at midpoint of first and last bins
-    bin_width = range() / (n_bins + 1);
+    double bin_width = range() / (n_bins + 1);
     double bin_start = min() - 0.5*bin_width;
 
     // Fill bin edges
@@ -61,7 +145,11 @@ void Histogram::generateHist(int n_bins_) {
 
 void Histogram::generatePDF() {
     pdf.resize(n_bins);
-    double total = bin_width * n_data;
+    double total = 0.0;
+// #pragma omp parallel for
+    for (int ib = 0; ib < n_bins; ib++) {
+        total += counts[ib] * (bin_edges[ib+1] - bin_edges[ib]);
+    }
 // #pragma omp parallel for
     for (int ib = 0; ib < n_bins; ib++) {
         pdf[ib] = counts[ib] / total;
@@ -73,8 +161,16 @@ void Histogram::generateCDF() {
     cdf[0] = 0.0;
 // #pragma omp parallel for
     for (int ib = 0; ib < n_bins; ib++) {
-        cdf[ib+1] = cdf[ib] + bin_width * pdf[ib];
+        cdf[ib+1] = cdf[ib] + (bin_edges[ib+1] - bin_edges[ib]) * pdf[ib];
     }
+}
+
+double Histogram::rand() {
+    std::uniform_real_distribution<double> uni_real(0, 1);
+    std::mt19937 eng(static_cast<uint64_t>(s_rand +
+            std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
+    s_rand++;
+    return rand(uni_real, eng);
 }
 
 double Histogram::rand(std::uniform_real_distribution<double>& uni_real,
@@ -91,7 +187,7 @@ double Histogram::rand(std::uniform_real_distribution<double>& uni_real,
         }
     }
     // Should never get here
-    throw std::runtime_error("Invalid seed number. Distribution must have limits [0, 1).");
+    throw std::runtime_error("Histogram::rand - Invalid seed number. Distribution must have limits [0, 1).");
 }
 
 double Histogram::min() {

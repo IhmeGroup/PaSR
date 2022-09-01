@@ -289,38 +289,49 @@ void PartiallyStirredReactor::print() {
     
 }
 
+void PartiallyStirredReactor::checkVar(int iv) {
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "> " + varName(iv) <<
+        std::left << std::setw(COL_WIDTH) << minState(iv) <<
+        std::left << std::setw(COL_WIDTH) << meanState(iv) <<
+        std::left << std::setw(COL_WIDTH) << maxState(iv) << std::endl;
+}
+
 void PartiallyStirredReactor::check() {
     std::cout << "--------------------------------------------------" << std::endl;
-    std::cout << "Starting step: " << step << std::endl;
-    std::cout << "> t: " << t << std::endl;
+    std::cout << "Starting step: " << step << ", t = " << t << std::endl;
+    std::cout << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "> Name" <<
+        std::left << std::setw(COL_WIDTH) << "Min" <<
+        std::left << std::setw(COL_WIDTH) << "Favre Mean" <<
+        std::left << std::setw(COL_WIDTH) << "Max" << std::endl;
     if (check_verbose) {
         for (int iv = 0; iv < nv; iv++) {
-            std::cout << "> " << varName(iv) << ":\t" <<
-                "min = " << minState(iv) << ",\t" <<
-                "fmean = " << meanState(iv) << ",\t" <<
-                "max = " << maxState(iv) << std::endl;
+            checkVar(iv);
         }
     } else {
         for (auto& iv : iv_check) {
-            std::cout << "> " << varName(iv) << ":\t" <<
-                "min = " << minState(iv) << ",\t" <<
-                "fmean = " << meanState(iv) << ",\t" <<
-                "max = " << maxState(iv) << std::endl;
+            checkVar(iv);
         }
     }
-    std::cout << "> a:\t" <<
-        "min = " << minAge() << ",\t" <<
-        "fmean = " << meanAge(true) << ",\t" <<
-        "max = " << maxAge() << std::endl;
-    std::cout << "> T:\t" <<
-        "min = " << minT() << ",\t" <<
-        "fmean = " << meanT(true) << ",\t" <<
-        "max = " << maxT() << std::endl;
-    std::cout << "> Z:\t" <<
-        "min = " << minZ() << ",\t" <<
-        "fmean = " << meanZ(true) << ",\t" <<
-        "max = " << maxZ() << std::endl;
-    std::cout << "rerror = " << rerror << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "> a" <<
+        std::left << std::setw(COL_WIDTH) << minAge() <<
+        std::left << std::setw(COL_WIDTH) << meanAge(true) <<
+        std::left << std::setw(COL_WIDTH) << maxAge() << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "> T" <<
+        std::left << std::setw(COL_WIDTH) << minT() <<
+        std::left << std::setw(COL_WIDTH) << meanT(true) <<
+        std::left << std::setw(COL_WIDTH) << maxT() << std::endl;
+    std::cout <<
+        std::left << std::setw(COL_WIDTH) << "> Z" <<
+        std::left << std::setw(COL_WIDTH) << minZ() <<
+        std::left << std::setw(COL_WIDTH) << meanZ(true) <<
+        std::left << std::setw(COL_WIDTH) << maxZ() << std::endl;
+    std::cout << std::endl;
+    std::cout << "> rerror = " << rerror << std::endl;
 }
 
 std::string PartiallyStirredReactor::varName(int iv) {

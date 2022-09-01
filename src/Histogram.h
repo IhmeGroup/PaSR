@@ -7,15 +7,22 @@ public:
     explicit Histogram();
     ~Histogram();
 
-    void read(std::string hist_filename);
+    void clear();
+    void printHist();
+    void printPDF();
+    void printCDF();
+
+    void readData(std::string data_filename);
     void resizeData(int n_data_);
     void setData(const double* data_);
 
+    void readHist(std::string hist_filename);
     void generate(int n_bins_=0);
     void generateHist(int n_bins_=0);
     void generatePDF();
     void generateCDF();
 
+    double rand();
     double rand(std::uniform_real_distribution<double>& uni_real,
                 std::mt19937& eng);
     double mean();
@@ -61,7 +68,8 @@ protected:
     std::vector<double> counts;
     std::vector<double> pdf;
     std::vector<double> cdf;
-    double bin_width;
+
+    int s_rand = 0;
 
 private:
 

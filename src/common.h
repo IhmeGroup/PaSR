@@ -4,6 +4,8 @@
 #include <functional>
 #include <omp.h>
 
+#define COL_WIDTH 15
+
 #pragma omp declare \
     reduction( \
         vec_double_min : \

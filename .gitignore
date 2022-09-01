@@ -32,10 +32,12 @@
 *.app
 
 # Build
-CMake*
-cmake*
+build/*
+build/CMake*
+build/cmake*
 Makefile
 
 # Custom
 .vscode
 pasr
+*.csv

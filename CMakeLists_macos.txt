@@ -14,7 +14,6 @@ set(UTILITIES_ROOT ${HOME}/local)
 find_package(OpenMP)
 
 set(CANTERA_ROOT /opt/homebrew/Caskroom/miniforge/base/envs/cantera_dev)
-# set(CANTERA_ROOT ${UTILITIES_ROOT}/cantera)
 
 include_directories(
     ${CANTERA_ROOT}/include)

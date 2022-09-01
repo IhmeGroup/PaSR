@@ -5,7 +5,10 @@
 #include <random>
 
 #include "cantera/base/ctexceptions.h"
-#include "cantera/core.h"
+#include "cantera/base/Solution.h"
+#include "cantera/thermo/ThermoPhase.h"
+#include "cantera/zeroD/IdealGasConstPressureReactor.h"
+#include "cantera/zeroD/ReactorNet.h"
 
 #include "Injector.h"
 #include "Particle.h"
@@ -78,6 +81,8 @@ protected:
     void recycleParticle(unsigned int ip, double p_inj);
     void calcConvergence();
     bool runDone();
+
+    void checkVar(int iv);
 
     double min(std::function<double(int)> xfunc);
     double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
