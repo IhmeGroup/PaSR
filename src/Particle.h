@@ -13,6 +13,26 @@ public:
     explicit Particle();
     ~Particle();
 
+    // Particle operator= (const Particle& rhs) {
+    //     for (int iv = 0; iv < nv; iv++) {
+    //         xvec[iv] = rhs.xvec[iv];
+    //     }
+    //     return *this;
+    // }
+
+    // Particle copyAll(const Particle& rhs) {
+    //     for (int iv = 0; iv < nv; iv++) {
+    //         xvec[iv] = rhs.xvec[iv];
+    //     }
+    //     index = rhs.index;
+    //     m_P = rhs.m_P;
+    //     age = rhs.age;
+    //     mass = rhs.mass;
+    //     tau_res = rhs.tau_res;
+    //     n_recycles = rhs.n_recycles;
+    //     return *this;
+    // }
+
     Particle operator+= (const Particle& rhs)& {
         for (int iv = 0; iv < nv; iv++) {
             xvec[iv] += rhs.xvec[iv];
@@ -72,6 +92,10 @@ public:
 
     double& getTauRes() {
         return tau_res;
+    }
+
+    int& getnRecycles() {
+        return n_recycles;
     }
 
     bool tooOld() {
@@ -190,6 +214,7 @@ protected:
     double age;
     double mass;
     double tau_res;
+    int n_recycles;
 
 private:
 };

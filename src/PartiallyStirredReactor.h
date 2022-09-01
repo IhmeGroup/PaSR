@@ -21,6 +21,7 @@ const double DEFAULT_T_STOP = -1.0;
 const double DEFAULT_DT = -1.0;
 const double DEFAULT_DT_SUB = -1.0;
 const std::string DEFAULT_CONVERGENCE_METRIC = "MEAN";
+const int DEFAULT_STATS_WINDOW = 1;
 const double DEFAULT_RTOL = -1.0;
 const int DEFAULT_MIN_STEPS_CONVERGE = -1;
 const std::string DEFAULT_MIX_MODEL = "FULL_MIX";
@@ -86,6 +87,7 @@ protected:
     void recycleParticle(unsigned int ip, double p_inj, int tid=0);
     void calcConvergence();
     bool runDone();
+    void copyState();
 
     void checkVar(int iv);
 
@@ -140,6 +142,8 @@ protected:
     double dt_step;
     double dt_sub_target;
     ConvergenceMetric convergence_metric;
+    int n_stat;
+    int i_stat;
     double rtol, rerror;
     double t;
     unsigned int step;
@@ -160,7 +164,6 @@ protected:
     std::vector<Cantera::IdealGasConstPressureReactor*> reactorvec;
     std::vector<Cantera::ReactorNet*> rnetvec;
 
-    std::vector<double> xvec;
     std::vector<Particle> pvec;
     std::vector<Injector> injvec;
     unsigned int nsp;

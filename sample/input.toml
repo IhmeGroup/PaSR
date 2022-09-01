@@ -3,13 +3,14 @@ name = "./gri30.yaml"
 
 [Numerics]
 n_particles = 100
-n_steps = 10
-# t_stop = 5.0
+# n_steps = 10
+t_stop = 1.0e-2
 # dt = 1.0e-6
 # dt_sub = 1.0e-7
 convergence_metric = "MEAN"
+stats_window = 10
 rtol = 1.0e-4
-min_steps_converge = 10
+min_steps_converge = 100
 
 [Models]
 mixing_model = "IEM"
@@ -18,15 +19,16 @@ mixing_model = "IEM"
 pressure = 101325.0
 comp_fuel = "CH4:1.0"
 comp_ox = "O2:0.21,N2:0.79"
-T_fuel = 300.0
-T_ox = 1200.0
-T_init = 1500.0
+T_fuel = 500.0
+T_ox = 1800.0
+T_init = 1800.0
 phi_global = 1.0
-tau_res_mode = "CONSTANT"
-tau_res = 1.0e-3
-# tau_res = "hist_test.csv"
+tau_res_mode = "DISTRIBUTION"
+# tau_res = 1.0e-3
+tau_res = "hist_test.csv"
 tau_mix = 1.0e-4
 
 [Output]
-check_interval = 1
+check_interval = 10
 check_verbose = false
+write_interval = 10

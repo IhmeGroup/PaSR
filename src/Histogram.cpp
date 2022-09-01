@@ -10,7 +10,7 @@
 #include "Histogram.h"
 
 Histogram::Histogram() :
-    n_data(0), n_bins(0)
+    n_data(0), n_bins(0), s_rand(0)
 {
 
 }
@@ -208,10 +208,7 @@ double Histogram::percentileToValue(double percentile) {
     } else if (percentile >= 1.0) {
         return bin_edges[n_bins+1];
     } else {
-        std::cout << "PERCENTILE: " << percentile << std::endl;
-        std::cout << "bins: " << n_bins << std::endl;
         for (int ib = 0; ib < n_bins; ib++) {
-            std::cout << cdf[ib] << " : " << cdf[ib+1] << std::endl;
             if (percentile < cdf[ib]) {
                 continue;
             } else if (percentile >= cdf[ib+1]) {

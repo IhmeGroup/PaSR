@@ -11,7 +11,7 @@
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
-    step(0), t(0.0), p_out(0.0)
+    step(0), t(0.0), p_out(0.0), i_stat(1)
 {
     parseInput();
 }
@@ -57,6 +57,9 @@ void PartiallyStirredReactor::parseInput() {
         throw(0);
     }
     std::cout << "> Numerics.convergence_metric = " << convergenceMetricString(convergence_metric) << std::endl;
+
+    n_stat = config->get_qualified_as<unsigned int>("Numerics.stats_window").value_or(DEFAULT_STATS_WINDOW);
+    std::cout << "> Numerics.stats_window = " << n_stat << std::endl;
     rtol = config->get_qualified_as<double>("Numerics.rtol").value_or(DEFAULT_RTOL);
     if (rtol > 0.0)
         std::cout << "> Numerics.rtol = " << rtol << std::endl;
@@ -134,7 +137,7 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
 
     // Initialization
-    // TODO - initialization methods
+    // TODO - various initialization methods
 
     // Output
     check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(DEFAULT_CHECK_INTERVAL);
@@ -153,7 +156,11 @@ void PartiallyStirredReactor::initialize() {
     rerror = std::numeric_limits<double>::infinity();
 
     // Create residence time histogram, if necessary
-    if (tau_res_mode == DISTRIBUTION) tau_res_hist.readHist(tau_res_hist_name);
+    if (tau_res_mode == DISTRIBUTION) {
+        tau_res_hist.readHist(tau_res_hist_name);
+        tau_res_hist.generatePDF();
+        tau_res_hist.generateCDF();
+    }
 
     // Set step sizes
     if (dt_step <= 0.0) {
@@ -163,7 +170,9 @@ void PartiallyStirredReactor::initialize() {
                 break;
             }
             case DISTRIBUTION: {
-                dt_step = 0.1 * std::min(tau_res_hist.percentileToValue(0.1), tau_mix);
+                double tau_res_10 = tau_res_hist.percentileToValue(0.1);
+                std::cout << "10th percentile residence time: " << tau_res_10 << std::endl;
+                dt_step = 0.1 * std::min(tau_res_10, tau_mix);
                 break;
             }
             // ^^ Capture the 10th percentile particle residence time
@@ -205,8 +214,7 @@ void PartiallyStirredReactor::initialize() {
     
     nsp = gasvec[0]->nSpecies();
     nv = nsp + 1;
-    pvec.resize(np);
-    xvec.resize(nv*np);
+    pvec.resize(np * n_stat);
     xtemp.resize(nv);
     xmean_old.resize(nv);
     Y_fuel.resize(nsp);
@@ -358,6 +366,8 @@ void PartiallyStirredReactor::check() {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Starting step: " << step << ", t = " << t << std::endl;
     std::cout << std::endl;
+    std::cout << "--- Stats for last " << n_stat <<
+        " steps as of beginning of step " << step << " ---" << std::endl;
     std::cout <<
         std::left << std::setw(COL_WIDTH) << "> Name" <<
         std::left << std::setw(COL_WIDTH) << "Min" <<
@@ -408,6 +418,9 @@ void PartiallyStirredReactor::takeStep() {
             check();
         }
     }
+
+    // Copy state to other stats region
+    copyState();
 
     // Adjust time step
     if ((t_stop > 0) && ((t + dt_step) > t_stop)) {
@@ -553,6 +566,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
     }
     pvec[ip].seth(injvec[iinj].h());
     pvec[ip].setY(injvec[iinj].Y().data());
+    pvec[ip].getnRecycles()++;
     // std::cout << "Recycling particle " << ip
     //     << " to injector " << iinj
     //     << " (p_inj = " << p_inj << ")" << std::endl;
@@ -585,25 +599,38 @@ void PartiallyStirredReactor::calcConvergence() {
 
 bool PartiallyStirredReactor::runDone() {
     if ((n_steps > 0) && (step >= n_steps)) {
-        std::cout << "Reached termination condition: step >= n_steps" << std::endl;
+        std::cout << "Reached termination condition: step >= n_steps at time t = " << t << std::endl;
         return true;
     }
     if ((t_stop > 0.0) && (t >= t_stop)) {
-        std::cout << "Reached termination condition: t >= t_stop" << std::endl;
+        std::cout << "Reached termination condition: t >= t_stop at step " << step << std::endl;
         return true;
     }
     if (rerror <= rtol && (step >= min_steps_converge)) {
         std::cout << "Reached termination condition: rerror (" <<
-            rerror << ") <= rtol (" << rtol << ")" << std::endl;
+            rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
     }
     return false;
 }
 
+void PartiallyStirredReactor::copyState() {
+    if (n_stat == 1) return;
+#pragma omp parallel for
+    for (int ip = 0; ip < np; ip++) {
+        pvec[ip + i_stat*np] = pvec[ip];
+    }
+    if (i_stat >= n_stat-1) {
+        i_stat = 1;
+    } else {
+        i_stat++;
+    }
+}
+
 double PartiallyStirredReactor::min(std::function<double(int)> xfunc) {
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         minval = std::min(minval, xfunc(ip));
     }
     return minval;
@@ -612,7 +639,7 @@ double PartiallyStirredReactor::min(std::function<double(int)> xfunc) {
 double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return minval;
@@ -621,7 +648,7 @@ double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera
 double PartiallyStirredReactor::minState(int iv) {
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         minval = std::min(minval, pvec[ip].state(iv));
     }
     return minval;
@@ -632,7 +659,7 @@ void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
     // Min across particles
     std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
 #pragma omp parallel for reduction(vec_double_min:minvec_temp)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         for (int iv = 0; iv < nv; iv++) {
             minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
         }
@@ -647,7 +674,7 @@ void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
 double PartiallyStirredReactor::max(std::function<double(int)> xfunc) {
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         maxval = std::max(maxval, xfunc(ip));
     }
     return maxval;
@@ -656,7 +683,7 @@ double PartiallyStirredReactor::max(std::function<double(int)> xfunc) {
 double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return maxval;
@@ -665,7 +692,7 @@ double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera
 double PartiallyStirredReactor::maxState(int iv) {
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         maxval = std::max(maxval, pvec[ip].state(iv));
     }
     return maxval;
@@ -676,7 +703,7 @@ void PartiallyStirredReactor::maxState(std::vector<double>* maxvec) {
     // Max across particles
     std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
 #pragma omp parallel for reduction(vec_double_max:maxvec_temp)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         for (int iv = 0; iv < nv; iv++) {
             maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
         }
@@ -692,7 +719,7 @@ double PartiallyStirredReactor::mean(std::function<double(int)> xfunc, bool favr
     double rhosum = 0.0;
     double xsum = 0.0;
 #pragma omp parallel for reduction(+:rhosum,xsum)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         double rho = 0.0;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -709,7 +736,7 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
     double rhosum = 0.0;
     double xsum = 0.0;
 #pragma omp parallel for reduction(+:rhosum,xsum)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         double rho = 0.0;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -726,7 +753,7 @@ double PartiallyStirredReactor::meanState(int iv, bool favre) {
     double rhosum = 0.0;
     double xsum = 0.0;
 #pragma omp parallel for reduction(+:rhosum,xsum)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         double rho = 0.0;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -745,7 +772,7 @@ void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool favr
     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
     double rhosum = 0.0;
 #pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < np; ip++) {
+    for (int ip = 0; ip < np * i_stat; ip++) {
         double rho;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);

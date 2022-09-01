@@ -71,7 +71,7 @@ protected:
     std::vector<double> pdf;
     std::vector<double> cdf;
 
-    int s_rand = 0;
+    int s_rand;
 
 private:
 
