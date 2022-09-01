@@ -60,6 +60,9 @@ void PartiallyStirredReactor::parseInput() {
     rtol = config->get_qualified_as<double>("Numerics.rtol").value_or(DEFAULT_RTOL);
     if (rtol > 0.0)
         std::cout << "> Numerics.rtol = " << rtol << std::endl;
+    min_steps_converge = config->get_qualified_as<unsigned int>("Numerics.min_steps_converge").value_or(DEFAULT_MIN_STEPS_CONVERGE);
+    if (min_steps_converge > 0)
+        std::cout << "> Numerics.min_steps_converge = " << min_steps_converge << std::endl;
 
     // Models
     std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or(DEFAULT_MIX_MODEL);
@@ -99,8 +102,34 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "> Conditions.T_init = " << T_init << std::endl;
     phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(DEFAULT_PHI_GLOBAL);
     std::cout << "> Conditions.phi_global = " << phi_global << std::endl;
-    tau_res = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES);
-    std::cout << "> Conditions.tau_res = " << tau_res << std::endl;
+    std::string tau_res_mode_str = config->get_qualified_as<std::string>("Conditions.tau_res_mode").value_or(DEFAULT_TAU_RES_MODE);
+    if (tau_res_mode_str == "CONSTANT") {
+        tau_res_mode = CONSTANT;
+    } else if (tau_res_mode_str == "DISTRIBUTION") {
+        tau_res_mode = DISTRIBUTION;
+    } else {
+        std::cerr <<
+          "Invalid tau_res mode: " +
+          tau_res_mode_str +
+          ". Must be CONSTANT or DISTRIBUTION." << std::endl;
+        throw(0);
+    }
+    std::cout << "> Conditions.tau_res_Mode = " << tauResModeString(tau_res_mode) << std::endl;
+    switch(tau_res_mode) {
+        case CONSTANT: {
+            tau_res_constant = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_CONSTANT);
+            std::cout << "> Conditions.tau_res = " << tau_res_constant << std::endl;
+            break;
+        }
+        case DISTRIBUTION: {
+            tau_res_hist_name = config->get_qualified_as<std::string>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_HIST_NAME);
+            std::cout << "> Conditions.tau_res = " << tau_res_hist_name << std::endl;
+            break;
+        }
+        default: {
+            break;
+        }
+    }
     tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(DEFAULT_TAU_MIX);
     std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
 
@@ -123,9 +152,22 @@ void PartiallyStirredReactor::initialize() {
     p_mix = 0.0;
     rerror = std::numeric_limits<double>::infinity();
 
+    // Create residence time histogram, if necessary
+    if (tau_res_mode == DISTRIBUTION) tau_res_hist.readHist(tau_res_hist_name);
+
     // Set step sizes
     if (dt_step <= 0.0) {
-        dt_step = 0.1 * std::min(tau_res, tau_mix);
+        switch (tau_res_mode) {
+            case CONSTANT: {
+                dt_step = 0.1 * std::min(tau_res_constant, tau_mix);
+                break;
+            }
+            case DISTRIBUTION: {
+                dt_step = 0.1 * std::min(tau_res_hist.percentileToValue(0.1), tau_mix);
+                break;
+            }
+            // ^^ Capture the 10th percentile particle residence time
+        }
         std::cout << "Setting dt automatically: " << dt_step << std::endl;
     }
     if (dt_sub_target < 0.0) {
@@ -219,25 +261,40 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize particles
     std::cout << "Initializing particles..." << std::endl;
-#pragma omp parallel for
-    for (int ip = 0; ip < np; ip++) {
-        pvec[ip].setP(&P);
-        pvec[ip].setIndex(ip);
-        pvec[ip].setnsp(nsp);
-        pvec[ip].setMass(1.0); // TODO: check this
-        pvec[ip].setAge(0.0);
-        pvec[ip].seth(h_equil);
-        pvec[ip].setY(Y_equil.data());
-        // if (ip <= (np-1) / 2.0) {
-        //     pvec[ip].setAge(0.0);
-        //     pvec[ip].seth(h_fuel);
-        //     pvec[ip].setY(Y_fuel.data());
-        // } else {
-        //     pvec[ip].setAge(1.0);
-        //     pvec[ip].seth(h_ox);
-        //     pvec[ip].setY(Y_ox.data());
-        // }
-        // pvec[ip].print();
+#pragma omp parallel
+    {
+        int tid = omp_get_thread_num();
+#pragma omp for
+        for (int ip = 0; ip < np; ip++) {
+            pvec[ip].setP(&P);
+            pvec[ip].setIndex(ip);
+            pvec[ip].setnsp(nsp);
+            pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
+            pvec[ip].seth(h_equil);
+            pvec[ip].setY(Y_equil.data());
+            switch (tau_res_mode) {
+                case CONSTANT: {
+                    pvec[ip].setAge(dists_uni_real[tid](rand_engines[tid]) * tau_res_constant);
+                    pvec[ip].setTauRes(tau_res_constant);
+                    break;
+                }
+                case DISTRIBUTION: {
+                    pvec[ip].setAge(0.0);
+                    pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
+                    break;
+                }
+            }
+            // if (ip <= (np-1) / 2.0) {
+            //     pvec[ip].setAge(0.0);
+            //     pvec[ip].seth(h_fuel);
+            //     pvec[ip].setY(Y_fuel.data());
+            // } else {
+            //     pvec[ip].setAge(1.0);
+            //     pvec[ip].seth(h_ox);
+            //     pvec[ip].setY(Y_ox.data());
+            // }
+            // pvec[ip].print();
+        }
     }
     std::cout << "Done initializing particles." << std::endl;
 
@@ -332,6 +389,7 @@ void PartiallyStirredReactor::check() {
         std::left << std::setw(COL_WIDTH) << maxZ() << std::endl;
     std::cout << std::endl;
     std::cout << "> rerror = " << rerror << std::endl;
+    std::cout << "--------------------------------------------------" << std::endl;
 }
 
 std::string PartiallyStirredReactor::varName(int iv) {
@@ -379,19 +437,16 @@ void PartiallyStirredReactor::takeStep() {
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
-    p_out += np * dt / tau_res; // Fractional particle count to recycle
-    int np_out = std::round(p_out); // Round to integer
-    p_out -= np_out; // Hold on to remainder for next step
-
 #pragma omp parallel
     {
         int tid = omp_get_thread_num();
 #pragma omp for
         // Iterate over particles and recycle
-        for (int ip_out = 0; ip_out < np_out; ip_out++) {
-            unsigned int ip = dists_uni_int[tid](rand_engines[tid]); // Index of particle to recycle
-            double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
-            recycleParticle(ip, p_inj);
+        for (int ip = 0; ip < np; ip++) {
+            if (pvec[ip].tooOld()) {
+                double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
+                recycleParticle(ip, p_inj, tid);
+            }
         }
     }
 }
@@ -475,7 +530,7 @@ void PartiallyStirredReactor::incrementAge() {
     }
 }
 
-void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj) {
+void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int tid) {
     int iinj;
     double flow_sum = 0.0;
     for (int i = 0; i < injvec.size(); i++) {
@@ -486,6 +541,16 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj) {
         }
     }
     pvec[ip].setAge(0.0);
+    switch (tau_res_mode) {
+        case CONSTANT: {
+            pvec[ip].setTauRes(tau_res_constant);
+            break;
+        }
+        case DISTRIBUTION: {
+            pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
+            break;
+        }
+    }
     pvec[ip].seth(injvec[iinj].h());
     pvec[ip].setY(injvec[iinj].Y().data());
     // std::cout << "Recycling particle " << ip
@@ -527,8 +592,9 @@ bool PartiallyStirredReactor::runDone() {
         std::cout << "Reached termination condition: t >= t_stop" << std::endl;
         return true;
     }
-    if (rerror <= rtol) {
-        std::cout << "Reached termination condition: rerror <= rtol" << std::endl;
+    if (rerror <= rtol && (step >= min_steps_converge)) {
+        std::cout << "Reached termination condition: rerror (" <<
+            rerror << ") <= rtol (" << rtol << ")" << std::endl;
         return true;
     }
     return false;

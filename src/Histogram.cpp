@@ -202,6 +202,51 @@ double Histogram::range() {
     return max() - min();
 }
 
+double Histogram::percentileToValue(double percentile) {
+    if (percentile <= 0.0) {
+        return bin_edges[0];
+    } else if (percentile >= 1.0) {
+        return bin_edges[n_bins+1];
+    } else {
+        std::cout << "PERCENTILE: " << percentile << std::endl;
+        std::cout << "bins: " << n_bins << std::endl;
+        for (int ib = 0; ib < n_bins; ib++) {
+            std::cout << cdf[ib] << " : " << cdf[ib+1] << std::endl;
+            if (percentile < cdf[ib]) {
+                continue;
+            } else if (percentile >= cdf[ib+1]) {
+                continue;
+            } else {
+                return bin_edges[ib] + (percentile - cdf[ib]) *
+                    (bin_edges[ib+1] - bin_edges[ib]) / (cdf[ib+1] - cdf[ib]);
+            }
+        }
+    }
+    // Should never get here
+    throw std::runtime_error("Histogram::percentileToValue - Should never get here.");
+}
+
+double Histogram::valueToPercentile(double value) {
+    if (value <= bin_edges[0]) {
+        return 0.0;
+    } else if (value >= bin_edges[n_bins+1]) {
+        return 1.0;
+    } else {
+        for (int ib = 0; ib < n_bins; ib++) {
+            if (value < bin_edges[ib]) {
+                continue;
+            } else if (value >= bin_edges[ib+1]) {
+                continue;
+            } else {
+                return cdf[ib] + (value - bin_edges[ib]) *
+                    (cdf[ib+1] - cdf[ib]) / (bin_edges[ib+1] - bin_edges[ib]);
+            }
+        }
+    }
+    // Should never get here
+    throw std::runtime_error("Histogram::percentileToValue - Should never get here.");
+}
+
 Histogram::~Histogram() {
 
 }

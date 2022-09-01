@@ -10,17 +10,19 @@
 #include "cantera/zeroD/IdealGasConstPressureReactor.h"
 #include "cantera/zeroD/ReactorNet.h"
 
+#include "Histogram.h"
 #include "Injector.h"
 #include "Particle.h"
 
 const std::string DEFAULT_MECH_NAME = "";
-const unsigned int DEFAULT_N_PARTICLES = 100;
-const unsigned int DEFAULT_N_STEPS = -1;
+const int DEFAULT_N_PARTICLES = 100;
+const int DEFAULT_N_STEPS = -1;
 const double DEFAULT_T_STOP = -1.0;
 const double DEFAULT_DT = -1.0;
 const double DEFAULT_DT_SUB = -1.0;
 const std::string DEFAULT_CONVERGENCE_METRIC = "MEAN";
 const double DEFAULT_RTOL = -1.0;
+const int DEFAULT_MIN_STEPS_CONVERGE = -1;
 const std::string DEFAULT_MIX_MODEL = "FULL_MIX";
 const double DEFAULT_PRESSURE = 101325.0;
 const std::string DEFAULT_COMP_FUEL = "";
@@ -29,13 +31,16 @@ const double DEFAULT_T_FUEL = 300.0;
 const double DEFAULT_T_OX = 300.0;
 const double DEFAULT_T_INIT = 300.0;
 const double DEFAULT_PHI_GLOBAL = 1.0;
-const double DEFAULT_TAU_RES = 1.0;
+const std::string DEFAULT_TAU_RES_MODE = "CONSTANT";
+const double DEFAULT_TAU_RES_CONSTANT = 1.0;
+const std::string DEFAULT_TAU_RES_HIST_NAME = "";
 const double DEFAULT_TAU_MIX = 1.0;
 const unsigned int DEFAULT_CHECK_INTERVAL = 1;
 const bool DEFAULT_CHECK_VERBOSE = false;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
+enum TauResMode {CONSTANT, DISTRIBUTION};
 
 class PartiallyStirredReactor {
 public:
@@ -78,7 +83,7 @@ protected:
     void subStepMix(double dt);
     void subStepReact(double dt);
     void incrementAge();
-    void recycleParticle(unsigned int ip, double p_inj);
+    void recycleParticle(unsigned int ip, double p_inj, int tid=0);
     void calcConvergence();
     bool runDone();
 
@@ -118,11 +123,19 @@ protected:
         }
     }
 
+    std::string tauResModeString(TauResMode tau_res_mode_) {
+        switch(tau_res_mode_) {
+            case CONSTANT: return "CONSTANT";
+            case DISTRIBUTION: return "DISTRIBUTION";
+        }
+    }
+
     std::string input_filename;
     std::string mech_filename;
     unsigned int np;
     int n_steps;
     int n_substeps;
+    int min_steps_converge;
     double t_stop;
     double dt_step;
     double dt_sub_target;
@@ -136,7 +149,11 @@ protected:
     double T_fuel, T_ox, T_init;
     double h_fuel, h_ox;
     double phi_global;
-    double tau_res, tau_mix;
+    TauResMode tau_res_mode;
+    double tau_res_constant;
+    std::string tau_res_hist_name;
+    Histogram tau_res_hist;
+    double tau_mix;
 
     std::vector<std::shared_ptr<Cantera::Solution>> solvec;
     std::vector<std::shared_ptr<Cantera::ThermoPhase>> gasvec;

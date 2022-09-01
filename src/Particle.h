@@ -70,6 +70,14 @@ public:
         return age;
     }
 
+    double& getTauRes() {
+        return tau_res;
+    }
+
+    bool tooOld() {
+        return age >= tau_res;
+    }
+
     double& h() {
         return xvec[c_offset_h];
     }
@@ -143,6 +151,10 @@ public:
     void setAge(double age_) {
         age = age_;
     }
+    
+    void setTauRes(double tau_res_) {
+        tau_res = tau_res_;
+    }
 
     void seth(double h) {
         xvec[c_offset_h] = h;
@@ -177,6 +189,7 @@ protected:
     std::vector<double> xvec;
     double age;
     double mass;
+    double tau_res;
 
 private:
 };

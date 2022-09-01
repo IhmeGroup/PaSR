@@ -9,6 +9,7 @@ n_steps = 10
 # dt_sub = 1.0e-7
 convergence_metric = "MEAN"
 rtol = 1.0e-4
+min_steps_converge = 10
 
 [Models]
 mixing_model = "IEM"
@@ -21,9 +22,11 @@ T_fuel = 300.0
 T_ox = 1200.0
 T_init = 1500.0
 phi_global = 1.0
+tau_res_mode = "CONSTANT"
 tau_res = 1.0e-3
+# tau_res = "hist_test.csv"
 tau_mix = 1.0e-4
 
 [Output]
-check_interval = 2
+check_interval = 1
 check_verbose = false

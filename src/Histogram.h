@@ -31,6 +31,8 @@ public:
     double min();
     double max();
     double range();
+    double percentileToValue(double percentile);
+    double valueToPercentile(double value);
     double variance();
     double stddev();
     double skewness();
