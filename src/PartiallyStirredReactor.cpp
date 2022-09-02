@@ -346,11 +346,6 @@ void PartiallyStirredReactor::initialize() {
         inj.print();
     }
 
-    // Initialize statistics
-    meanState(&xmean_old, true, true);
-    varianceState(&xvar_old, true, true);
-    writeStatsHeaders();
-
     // Initialize variable functions
     for (int iv = 0; iv < n_state_variables; iv++) {
         variable_functions.push_back(
@@ -393,6 +388,11 @@ void PartiallyStirredReactor::initialize() {
             iv_check.push_back(iv);
         }
     }
+
+    // Initialize statistics
+    meanState(&xmean_old, true, true);
+    varianceState(&xvar_old, true, true);
+    writeStatsHeaders();
 }
 
 void PartiallyStirredReactor::run() {
