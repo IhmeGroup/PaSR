@@ -33,7 +33,7 @@ public:
         m_Y.resize(n_species);
     }
 
-    double getFlow() {
+    double& getFlow() {
         return flow;
     }
 

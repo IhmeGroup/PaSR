@@ -45,6 +45,8 @@ enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
 enum TauResMode {CONSTANT, DISTRIBUTION};
 
+const std::string RAW_NAME = "particle_data";
+const std::string RAW_EXT = ".csv";
 const std::string STATS_DIR = "stats";
 const std::string STATS_PREFIX = "stats_";
 const std::string STATS_EXT = ".csv";
@@ -93,6 +95,8 @@ protected:
     std::string statsPath(std::string name);
     void writeStatsHeaders();
     void writeStats();
+    void writeRawHeaders();
+    void writeRaw();
 
     void checkVariable(int iv);
 
@@ -184,7 +188,8 @@ protected:
     std::vector<std::string> check_variable_names;
     std::vector<unsigned int> iv_check;
     bool check_verbose;
-    unsigned int write_interval;
+    unsigned int write_raw_interval;
+    unsigned int write_stats_interval;
 
 private:
     

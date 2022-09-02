@@ -160,9 +160,18 @@ void PartiallyStirredReactor::parseInput() {
     }
     check_verbose = config->get_qualified_as<bool>("Output.check_verbose").value_or(DEFAULT_CHECK_VERBOSE);
     std::cout << "> Output.check_verbose = " << check_verbose << std::endl;
-    write_interval = config->get_qualified_as<unsigned int>("Output.write_interval").value_or(DEFAULT_WRITE_INTERVAL);
-    if (write_interval < 0) write_interval = check_interval;
-    std::cout << "> Output.write_interval = " << write_interval << std::endl;
+    write_raw_interval = config->get_qualified_as<unsigned int>("Output.write_raw_interval").value_or(DEFAULT_WRITE_INTERVAL);
+    if (write_raw_interval < 0) {
+        write_raw_interval = n_stat;
+    }
+    std::cout << "> Output.write_raw_interval = " << write_raw_interval << std::endl;
+    if (write_raw_interval < n_stat) {
+        std::cout << "WARNING: write_raw_interval < stats_window will result in duplicate data. " <<
+            "Recommend write_raw_interval = stats_window" << std::endl;
+    }
+    write_stats_interval = config->get_qualified_as<unsigned int>("Output.write_stats_interval").value_or(DEFAULT_WRITE_INTERVAL);
+    if (write_stats_interval < 0) write_stats_interval = check_interval;
+    std::cout << "> Output.write_stats_interval = " << write_stats_interval << std::endl;
 
     std::cout << "--------------------------------------------------" << std::endl;
 }
@@ -392,6 +401,9 @@ void PartiallyStirredReactor::initialize() {
     // Initialize statistics
     meanState(&xmean_old, true, true);
     varianceState(&xvar_old, true, true);
+
+    // Initialize output files
+    writeRawHeaders();
     writeStatsHeaders();
 }
 
@@ -497,7 +509,8 @@ void PartiallyStirredReactor::takeStep() {
     // Calculate convergence metric
     calcConvergence();
 
-    // Write stats
+    // Write data
+    writeRaw();
     writeStats();
 }
 
@@ -717,6 +730,38 @@ void PartiallyStirredReactor::copyState() {
     }
 }
 
+void PartiallyStirredReactor::writeRawHeaders() {
+    std::ofstream file;
+    file.open(RAW_NAME + RAW_EXT);
+    for (int iv = 0; iv < nVariables(); iv++) {
+        file << variableName(iv);
+        if (iv < nVariables()-1) {
+            file << ",";
+        } else {
+            file << std::endl;
+        }
+    }
+    file.close();
+}
+
+void PartiallyStirredReactor::writeRaw() {
+    if (step % write_raw_interval != 0) return;
+
+    std::ofstream file;
+    file.open(RAW_NAME + RAW_EXT, std::ios_base::app);
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+        for (int iv = 0; iv < nVariables(); iv++) {
+            file << std::setprecision(WRITE_PRECISION) << variable_functions[iv](gasvec[0], ip);
+            if (iv < nVariables()-1) {
+                file << ",";
+            } else {
+                file << std::endl;
+            }
+        }
+    }
+    file.close();
+}
+
 std::string PartiallyStirredReactor::statsPath(std::string name) {
     return STATS_DIR + "/" + STATS_PREFIX + name + STATS_EXT;
 }
@@ -740,10 +785,10 @@ void PartiallyStirredReactor::writeStatsHeaders() {
     file_variance << "step,time,";
 
     for (int iv = 0; iv < nVariables(); iv++) {
-        file_min << std::setprecision(WRITE_PRECISION) << variableName(iv);
-        file_max << std::setprecision(WRITE_PRECISION) << variableName(iv);
-        file_fmean << std::setprecision(WRITE_PRECISION) << variableName(iv);
-        file_variance << std::setprecision(WRITE_PRECISION) << variableName(iv);
+        file_min << variableName(iv);
+        file_max << variableName(iv);
+        file_fmean << variableName(iv);
+        file_variance << variableName(iv);
         if (iv < nVariables()-1) {
             file_min << ",";
             file_max << ",";
@@ -764,7 +809,7 @@ void PartiallyStirredReactor::writeStatsHeaders() {
 }
 
 void PartiallyStirredReactor::writeStats() {
-    if (step % write_interval != 0) return;
+    if (step % write_stats_interval != 0) return;
 
     std::ofstream file_min;
     std::ofstream file_max;
