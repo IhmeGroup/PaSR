@@ -53,7 +53,7 @@ public:
     void print();
     void check();
 
-    std::string varName(int iv);
+    std::string variableName(int iv);
 
     double minState(int iv);
     void minState(std::vector<double>* minvec);
@@ -68,23 +68,11 @@ public:
     void histState(std::vector<double>* histvec, int iv);
     void histState(std::vector<std::vector<double>>* histvec);
 
-    double meanAge(bool favre=true);
-    double varianceAge(bool favre=true);
-    double varianceAge(double meanval);
-    double minAge();
-    double maxAge();
-
-    double meanT(bool favre=true);
-    double varianceT(bool favre=true);
-    double varianceT(double meanval);
-    double minT();
-    double maxT();
-
-    double meanZ(bool favre=true);
-    double varianceZ(bool favre=true);
-    double varianceZ(double meanval);
-    double minZ();
-    double maxZ();
+    double mean(int iv, bool favre=true);
+    double variance(int iv, bool favre=true);
+    double variance(int iv, double meanval);
+    double min(int iv);
+    double max(int iv);
 
 protected:
     void parseInput();
@@ -99,21 +87,12 @@ protected:
     void copyState();
     void writeStats();
 
-    void checkVar(int iv);
+    void checkVariable(int iv);
 
-    double min(std::function<double(int)> xfunc);
     double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
-
-    double max(std::function<double(int)> xfunc);
     double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
-
-    double mean(std::function<double(int)> xfunc, bool favre=true);
     double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
-
-    double variance(std::function<double(int)> xfunc, bool favre=true);
     double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
-
-    void hist(std::vector<double>* histvec, std::function<double(int)> xfunc);
     void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
 
     std::string convergenceMetricString(ConvergenceMetric convergence_metric_) {
@@ -144,7 +123,7 @@ protected:
 
     std::string input_filename;
     std::string mech_filename;
-    unsigned int np;
+    unsigned int n_particles;
     int n_steps;
     int n_substeps;
     int min_steps_converge;
@@ -176,11 +155,16 @@ protected:
 
     std::vector<Particle> pvec;
     std::vector<Injector> injvec;
-    unsigned int nsp;
-    unsigned int nv;
+    unsigned int n_species;
+    unsigned int n_state_variables;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
     std::vector<double> xtemp1, xtemp2;
     std::vector<double> xmean_old, xvar_old;
+
+    int n_derived_variables;
+    std::vector<std::string> derived_variable_names;
+    std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)>> variable_functions;
+    std::vector<double> xtemp_derived;
 
     std::vector<unsigned int> i_fuel;
     std::vector<unsigned int> iv_check;

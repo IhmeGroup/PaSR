@@ -5,7 +5,7 @@
 class Injector {
 public:
     explicit Injector();
-    explicit Injector(const int& index, const unsigned int& nsp_);
+    explicit Injector(const int& index, const unsigned int& n_species_);
     ~Injector();
 
     double& h() {
@@ -28,9 +28,9 @@ public:
         index = index_;
     }
 
-    void setnsp(const unsigned int& nsp_) {
-        nsp = nsp_;
-        m_Y.resize(nsp);
+    void setnSpecies(const unsigned int& n_species_) {
+        n_species = n_species_;
+        m_Y.resize(n_species);
     }
 
     double getFlow() {
@@ -50,7 +50,7 @@ public:
     }
 
     void setY(const double* Y_) {
-        for (int k = 0; k < nsp; k++) {
+        for (int k = 0; k < n_species; k++) {
             m_Y[k] = Y_[k];
         }
     }
@@ -64,7 +64,7 @@ public:
 
 protected:
     int index;
-    unsigned int nsp;
+    unsigned int n_species;
     double flow;
     double m_h;
     std::vector<double> m_Y;

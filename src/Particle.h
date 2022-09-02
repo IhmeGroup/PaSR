@@ -14,14 +14,14 @@ public:
     ~Particle();
 
     // Particle operator= (const Particle& rhs) {
-    //     for (int iv = 0; iv < nv; iv++) {
+    //     for (int iv = 0; iv < n_state_variables; iv++) {
     //         xvec[iv] = rhs.xvec[iv];
     //     }
     //     return *this;
     // }
 
     // Particle copyAll(const Particle& rhs) {
-    //     for (int iv = 0; iv < nv; iv++) {
+    //     for (int iv = 0; iv < n_state_variables; iv++) {
     //         xvec[iv] = rhs.xvec[iv];
     //     }
     //     index = rhs.index;
@@ -34,7 +34,7 @@ public:
     // }
 
     Particle operator+= (const Particle& rhs)& {
-        for (int iv = 0; iv < nv; iv++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] += rhs.xvec[iv];
         }
         return *this;
@@ -46,7 +46,7 @@ public:
     }
 
     Particle operator-= (const Particle& rhs)& {
-        for (int iv = 0; iv < nv; iv++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] -= rhs.xvec[iv];
         }
         return *this;
@@ -58,7 +58,7 @@ public:
     }
 
     Particle operator*= (const double& rhs)& {
-        for (int iv = 0; iv < nv; iv++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] *= rhs;
         }
         return *this;
@@ -158,10 +158,10 @@ public:
         index = index_;
     }
 
-    void setnsp(int nsp_) {
-        nsp = nsp_;
-        nv = nsp + c_offset_Y;
-        xvec.resize(nv);
+    void setnSpecies(int n_species_) {
+        n_species = n_species_;
+        n_state_variables = n_species + c_offset_Y;
+        xvec.resize(n_state_variables);
     }
     
     void setMass(double mass_) {
@@ -185,7 +185,7 @@ public:
     }
 
     void setY(const double* Y) {
-        for (int k = 0; k < nsp; k++) {
+        for (int k = 0; k < n_species; k++) {
             xvec[c_offset_Y + k] = Y[k];
         }
     }
@@ -196,7 +196,7 @@ public:
     }
 
     void setState(const double* state) {
-        for (int iv = 0; iv < nv; iv++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] = state[iv];
         }
     }
@@ -207,8 +207,8 @@ public:
 
 protected:
     int index;
-    int nsp;
-    int nv;
+    int n_species;
+    int n_state_variables;
     double* m_P = nullptr;
     std::vector<double> xvec;
     double age;

@@ -9,7 +9,7 @@ void Particle::print(double threshold) {
     std::cout << "Particle " << index << ":" << std::endl;
     std::cout << "> h: " << h() << std::endl;
     std::cout << "> Y: " << std::endl;
-    for (int k = 0; k < nsp; k++) {
+    for (int k = 0; k < n_species; k++) {
         if (Y(k) >= threshold) {
             std::cout << ">   " << k << ": " << Y(k) << std::endl;
         }
