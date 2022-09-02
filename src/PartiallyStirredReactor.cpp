@@ -286,7 +286,7 @@ void PartiallyStirredReactor::initialize() {
     {
         int tid = omp_get_thread_num();
 #pragma omp for
-        for (int ip = 0; ip < n_particles; ip++) {
+        for (int ip = 0; ip < n_particles * n_stat; ip++) {
             pvec[ip].setP(&P);
             pvec[ip].setIndex(ip);
             pvec[ip].setnSpecies(n_species);
@@ -339,8 +339,8 @@ void PartiallyStirredReactor::initialize() {
     }
 
     // Initialize statistics
-    meanState(&xmean_old, true);
-    varianceState(&xvar_old, true);
+    meanState(&xmean_old, true, true);
+    varianceState(&xvar_old, true, true);
 
     // Initialize variable functions
     for (int iv = 0; iv < n_state_variables; iv++) {
@@ -394,13 +394,13 @@ void PartiallyStirredReactor::print() {
 }
 
 void PartiallyStirredReactor::checkVariable(int iv) {
-    double meanval = mean(iv);
+    double meanval = mean(iv, true, true);
     std::cout <<
         std::left << std::setw(COL_WIDTH) << "> " + variableName(iv) <<
-        std::left << std::setw(COL_WIDTH) << min(iv) <<
+        std::left << std::setw(COL_WIDTH) << min(iv, true) <<
         std::left << std::setw(COL_WIDTH) << meanval <<
-        std::left << std::setw(COL_WIDTH) << variance(iv, meanval) <<
-        std::left << std::setw(COL_WIDTH) << max(iv) << std::endl;
+        std::left << std::setw(COL_WIDTH) << variance(iv, meanval, true) <<
+        std::left << std::setw(COL_WIDTH) << max(iv, true) << std::endl;
 }
 
 void PartiallyStirredReactor::check() {
@@ -510,7 +510,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case FULL_MIX: {
-            meanState(&xtemp1, true);
+            meanState(&xtemp1, false, true);
             // Set all particles to Favre mean state
 #pragma omp parallel for
             for (int ip = 0; ip < n_particles; ip++) {
@@ -545,7 +545,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case IEM: {
-            meanState(&xtemp1, true);
+            meanState(&xtemp1, false, true);
             Particle pmean;
             pmean.setnSpecies(n_species);
             pmean.setState(xtemp1.data());
@@ -615,7 +615,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
 void PartiallyStirredReactor::calcConvergence() {
     switch (convergence_metric) {
         case MEAN: {
-            meanState(&xtemp1, true);
+            meanState(&xtemp1, true, true);
             rerror = 0.0;
             for (int iv = 0; iv < n_state_variables; iv++) {
                 rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
@@ -624,8 +624,8 @@ void PartiallyStirredReactor::calcConvergence() {
             break;
         }
         case MEAN_VAR: {
-            meanState(&xtemp1, true);
-            varianceState(&xtemp2, &xtemp1);
+            meanState(&xtemp1, true, true);
+            varianceState(&xtemp2, &xtemp1, true);
             rerror = 0.0;
             for (int iv = 0; iv < n_state_variables; iv++) {
                 rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
@@ -680,63 +680,53 @@ void PartiallyStirredReactor::writeStats() {
 
 }
 
-double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
+double PartiallyStirredReactor::min(int iv, bool all) {
+    return min(variable_functions[iv], all);
+}
+
+double PartiallyStirredReactor::max(int iv, bool all) {
+    return max(variable_functions[iv], all);
+}
+
+double PartiallyStirredReactor::mean(int iv, bool all, bool favre) {
+    return mean(variable_functions[iv], all, favre);
+}
+
+double PartiallyStirredReactor::variance(int iv, bool all, bool favre) {
+    double meanval = mean(variable_functions[iv], all, favre);
+    return variance(variable_functions[iv], meanval, all);
+}
+
+double PartiallyStirredReactor::variance(int iv, double meanval, bool all) {
+    return variance(variable_functions[iv], meanval, all);
+}
+
+double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return minval;
 }
 
-void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
-
-    // Min across particles
-    std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
-#pragma omp parallel for reduction(vec_double_min:minvec_temp)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
-        }
-    }
-
-    // Write to minvec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*minvec)[iv] = minvec_temp[iv];
-    }
-}
-
-double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
+double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return maxval;
 }
 
-void PartiallyStirredReactor::maxState(std::vector<double>* maxvec) {
-
-    // Max across particles
-    std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
-#pragma omp parallel for reduction(vec_double_max:maxvec_temp)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
-        }
-    }
-
-    // Write to maxvec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*maxvec)[iv] = maxvec_temp[iv];
-    }
-}
-
-double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre) {
+double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double rhosum = 0.0;
     double xsum = 0.0;
 #pragma omp parallel for reduction(+:rhosum,xsum)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         double rho = 0.0;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -749,13 +739,61 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
     return xsum / rhosum;
 }
 
-void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool favre) {
+double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+    double meanval = mean(xfunc, favre);
+    double varsum = 0.0;
+#pragma omp parallel for reduction(+:varsum)
+    for (int ip = 0; ip < ip_stop; ip++) {
+        varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip) - meanval), 2.0);
+    }
+    return varsum / n_particles;
+}
+
+void PartiallyStirredReactor::minState(std::vector<double>* minvec, bool all) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+
+    // Min across particles
+    std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
+#pragma omp parallel for reduction(vec_double_min:minvec_temp)
+    for (int ip = 0; ip < ip_stop; ip++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
+            minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
+        }
+    }
+
+    // Write to minvec
+    for (int iv = 0; iv < n_state_variables; iv++) {
+        (*minvec)[iv] = minvec_temp[iv];
+    }
+}
+
+void PartiallyStirredReactor::maxState(std::vector<double>* maxvec, bool all) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+
+    // Max across particles
+    std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
+#pragma omp parallel for reduction(vec_double_max:maxvec_temp)
+    for (int ip = 0; ip < ip_stop; ip++) {
+        for (int iv = 0; iv < n_state_variables; iv++) {
+            maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
+        }
+    }
+
+    // Write to maxvec
+    for (int iv = 0; iv < n_state_variables; iv++) {
+        (*maxvec)[iv] = maxvec_temp[iv];
+    }
+}
+
+void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool all, bool favre) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
     // Sum across particles
     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
     double rhosum = 0.0;
 #pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         double rho;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -774,24 +812,15 @@ void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool favr
     }
 }
 
-double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre) {
-    double meanval = mean(xfunc, favre);
-    double varsum = 0.0;
-#pragma omp parallel for reduction(+:varsum)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
-        varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip) - meanval), 2.0);
-    }
-    return varsum / n_particles;
-}
-
-void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, bool favre) {
+void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, bool all, bool favre) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
     // Sum across particles
     std::vector<double> xmeanvec(xvarvec->size(), 0.0);
     meanState(&xmeanvec, favre);
     std::vector<double> xsumvec(xvarvec->size(), 0.0);
 #pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xsumvec[iv] += std::pow((pvec[ip].state(iv) - xmeanvec[iv]), 2.0);
         }
@@ -803,12 +832,13 @@ void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, bool f
     }
 }
 
-void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, std::vector<double>* xmeanvec) {
+void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, std::vector<double>* xmeanvec, bool all) {
+    int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
     // Sum across particles
     std::vector<double> xsumvec(xvarvec->size(), 0.0);
 #pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * n_stat; ip++) {
+    for (int ip = 0; ip < ip_stop; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xsumvec[iv] += std::pow((pvec[ip].state(iv) - (*xmeanvec)[iv]), 2.0);
         }
@@ -818,27 +848,6 @@ void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, std::v
     for (int iv = 0; iv < n_state_variables; iv++) {
         (*xvarvec)[iv] = xsumvec[iv] / n_particles;
     }
-}
-
-double PartiallyStirredReactor::min(int iv) {
-    return min(variable_functions[iv]);
-}
-
-double PartiallyStirredReactor::max(int iv) {
-    return max(variable_functions[iv]);
-}
-
-double PartiallyStirredReactor::mean(int iv, bool favre) {
-    return mean(variable_functions[iv], favre);
-}
-
-double PartiallyStirredReactor::variance(int iv, bool favre) {
-    double meanval = mean(variable_functions[iv], favre);
-    return variance(variable_functions[iv], meanval);
-}
-
-double PartiallyStirredReactor::variance(int iv, double meanval) {
-    return variance(variable_functions[iv], meanval);
 }
 
 PartiallyStirredReactor::~PartiallyStirredReactor() {

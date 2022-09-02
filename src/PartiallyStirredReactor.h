@@ -58,19 +58,19 @@ public:
     int variableIndex(std::string name);
     int nVariables() { return n_state_variables + n_derived_variables; }
 
-    double min(int iv);
-    double max(int iv);
-    double mean(int iv, bool favre=true);
-    double variance(int iv, bool favre=true);
-    double variance(int iv, double meanval);
-    void hist(std::vector<double>* histvec, int iv);
+    double min(int iv, bool all=false);
+    double max(int iv, bool all=false);
+    double mean(int iv, bool all=false, bool favre=true);
+    double variance(int iv, bool all=false, bool favre=true);
+    double variance(int iv, double meanval, bool all=false);
+    void hist(std::vector<double>* histvec, int iv, bool all=false);
 
-    void minState(std::vector<double>* minvec);
-    void maxState(std::vector<double>* maxvec);
-    void meanState(std::vector<double>* xsumvec, bool favre=true);
-    void varianceState(std::vector<double>* xvarvec, bool favre=true);
-    void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec);
-    void histState(std::vector<std::vector<double>>* histvec);
+    void minState(std::vector<double>* minvec, bool all=false);
+    void maxState(std::vector<double>* maxvec, bool all=false);
+    void meanState(std::vector<double>* xsumvec, bool all=false, bool favre=true);
+    void varianceState(std::vector<double>* xvarvec, bool all=false, bool favre=true);
+    void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec, bool all=false);
+    void histState(std::vector<std::vector<double>>* histvec, bool all=false);
 
 protected:
     void parseInput();
@@ -87,11 +87,11 @@ protected:
 
     void checkVariable(int iv);
 
-    double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
-    double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
-    double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
-    double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
-    void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
+    double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
+    double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
+    double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false, bool favre=true);
+    double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false, bool favre=true);
+    void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
 
     std::string convergenceMetricString(ConvergenceMetric convergence_metric_) {
         switch(convergence_metric_) {
