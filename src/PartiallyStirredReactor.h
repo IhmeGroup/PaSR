@@ -81,6 +81,7 @@ public:
 protected:
     void parseInput();
     void takeStep();
+    void calcDt();
     void subStepInflow(double dt);
     void subStepMix(double dt);
     void subStepReact(double dt);
@@ -135,7 +136,8 @@ protected:
     int min_steps_converge;
     double t_stop;
     double dt_step;
-    double dt_sub_target;
+    int n_sub;
+    double dt_sub, dt_sub_target;
     ConvergenceMetric convergence_metric;
     int n_stat;
     int i_stat;

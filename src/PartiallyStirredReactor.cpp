@@ -419,6 +419,8 @@ void PartiallyStirredReactor::checkVariable(int iv) {
 }
 
 void PartiallyStirredReactor::check() {
+    if (check_interval == 0) return;
+    else if ((step % check_interval) != 0) return;
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Starting step: " << step << ", t = " << t << std::endl;
     std::cout << std::endl;
@@ -467,33 +469,26 @@ int PartiallyStirredReactor::variableIndex(std::string name) {
 
 void PartiallyStirredReactor::takeStep() {
     // Print status
-    if (check_interval > 0) {
-        if ((step % check_interval) == 0) {
-            check();
-        }
-    }
+    check();
 
     // Copy state to other stats region
     copyState();
 
     // Adjust time step
-    if ((t_stop > 0) && ((t + dt_step) > t_stop)) {
-        dt_step = t_stop - t;
-    }
-
-    int n_substeps = 1 + std::round(dt_step / dt_sub_target);
-    double dt_sub = dt_step / n_substeps;
+    calcDt();
 
     // Take substeps
     // for (Particle& p : pvec) p.print();
     subStepInflow(dt_step);
     // for (Particle& p : pvec) p.print();
-    for (int isub = 0; isub < n_substeps; isub++) {
+    for (int isub = 0; isub < n_sub; isub++) {
         subStepMix(dt_sub);
         // for (Particle& p : pvec) p.print();
         subStepReact(dt_sub);
         // for (Particle& p : pvec) p.print();
     }
+    // for (Particle& p : pvec) p.print();
+
     // Increment counters
     incrementAge();
     step++;
@@ -504,6 +499,14 @@ void PartiallyStirredReactor::takeStep() {
 
     // Write stats
     writeStats();
+}
+
+void PartiallyStirredReactor::calcDt() {
+    if ((t_stop > 0) && ((t + dt_step) > t_stop)) {
+        dt_step = t_stop - t;
+    }
+    n_sub = 1 + std::round(dt_step / dt_sub_target);
+    dt_sub = dt_step / n_sub;
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
