@@ -76,7 +76,7 @@ void Histogram::printCDF() {
 void Histogram::readHist(std::string hist_filename) {
     clear();
     std::string line, word;
-    std::fstream file(hist_filename, std::ios::in);
+    std::ifstream file(hist_filename);
     if (file.is_open()) {
         while (getline(file, line)) {
             std::stringstream str(line);

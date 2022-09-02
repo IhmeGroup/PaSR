@@ -1,4 +1,6 @@
 #include <fstream>
+#include <filesystem>
+#include <iomanip>
 #include <cmath>
 #include <limits>
 #include <algorithm>
@@ -9,6 +11,12 @@
 
 #include "common.h"
 #include "PartiallyStirredReactor.h"
+
+#ifdef __APPLE__
+namespace fs = std::__fs::filesystem;
+#else
+namespace fs = std::filesystem;
+#endif
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
@@ -341,6 +349,7 @@ void PartiallyStirredReactor::initialize() {
     // Initialize statistics
     meanState(&xmean_old, true, true);
     varianceState(&xvar_old, true, true);
+    writeStatsHeaders();
 
     // Initialize variable functions
     for (int iv = 0; iv < n_state_variables; iv++) {
@@ -492,6 +501,9 @@ void PartiallyStirredReactor::takeStep() {
 
     // Calculate convergence metric
     calcConvergence();
+
+    // Write stats
+    writeStats();
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
@@ -682,8 +694,94 @@ void PartiallyStirredReactor::copyState() {
     }
 }
 
-void PartiallyStirredReactor::writeStats() {
+std::string PartiallyStirredReactor::statsPath(std::string name) {
+    return STATS_DIR + "/" + STATS_PREFIX + name + STATS_EXT;
+}
 
+void PartiallyStirredReactor::writeStatsHeaders() {
+    fs::create_directories(STATS_DIR);
+
+    std::ofstream file_min;
+    std::ofstream file_max;
+    std::ofstream file_fmean;
+    std::ofstream file_variance;
+
+    file_min.open(statsPath("min"));
+    file_max.open(statsPath("max"));
+    file_fmean.open(statsPath("fmean"));
+    file_variance.open(statsPath("variance"));
+
+    file_min << "step,time,";
+    file_max << "step,time,";
+    file_fmean << "step,time,";
+    file_variance << "step,time,";
+
+    for (int iv = 0; iv < nVariables(); iv++) {
+        file_min << std::setprecision(WRITE_PRECISION) << variableName(iv);
+        file_max << std::setprecision(WRITE_PRECISION) << variableName(iv);
+        file_fmean << std::setprecision(WRITE_PRECISION) << variableName(iv);
+        file_variance << std::setprecision(WRITE_PRECISION) << variableName(iv);
+        if (iv < nVariables()-1) {
+            file_min << ",";
+            file_max << ",";
+            file_fmean << ",";
+            file_variance << ",";
+        } else {
+            file_min << std::endl;
+            file_max << std::endl;
+            file_fmean << std::endl;
+            file_variance << std::endl;
+        }
+    }
+
+    file_min.close();
+    file_max.close();
+    file_fmean.close();
+    file_variance.close();
+}
+
+void PartiallyStirredReactor::writeStats() {
+    if (step % write_interval != 0) return;
+
+    std::ofstream file_min;
+    std::ofstream file_max;
+    std::ofstream file_fmean;
+    std::ofstream file_variance;
+
+    file_min.open(statsPath("min"), std::ios_base::app);
+    file_max.open(statsPath("max"), std::ios_base::app);
+    file_fmean.open(statsPath("fmean"), std::ios_base::app);
+    file_variance.open(statsPath("variance"), std::ios_base::app);
+
+    file_min << step << "," << t << ",";
+    file_max << step << "," << t << ",";
+    file_fmean << step << "," << t << ",";
+    file_variance << step << "," << t << ",";
+
+    for (int iv = 0; iv < nVariables(); iv++) {
+        double meanval = mean(iv, true, true);
+        file_min << std::setprecision(WRITE_PRECISION) << min(iv, true);
+        file_max << std::setprecision(WRITE_PRECISION) << max(iv, true);
+        file_fmean << std::setprecision(WRITE_PRECISION) << meanval;
+        file_variance << std::setprecision(WRITE_PRECISION) << variance(iv, meanval, true);
+
+        if (iv < nVariables()-1) {
+            file_min << ",";
+            file_max << ",";
+            file_fmean << ",";
+            file_variance << ",";
+        } else {
+            file_min << std::endl;
+            file_max << std::endl;
+            file_fmean << std::endl;
+            file_variance << std::endl;
+        }
+    }
+
+    file_min.close();
+    file_max.close();
+    file_fmean.close();
+    file_variance.close();
 }
 
 double PartiallyStirredReactor::min(int iv, bool all) {

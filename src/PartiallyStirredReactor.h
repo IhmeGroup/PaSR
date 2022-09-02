@@ -45,6 +45,12 @@ enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
 enum TauResMode {CONSTANT, DISTRIBUTION};
 
+const std::string STATS_DIR = "stats";
+const std::string STATS_PREFIX = "stats_";
+const std::string STATS_EXT = ".csv";
+
+const int WRITE_PRECISION = 15;
+
 class PartiallyStirredReactor {
 public:
     explicit PartiallyStirredReactor(const std::string& input_filename_);
@@ -83,6 +89,8 @@ protected:
     void calcConvergence();
     bool runDone();
     void copyState();
+    std::string statsPath(std::string name);
+    void writeStatsHeaders();
     void writeStats();
 
     void checkVariable(int iv);
