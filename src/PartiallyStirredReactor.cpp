@@ -478,16 +478,16 @@ void PartiallyStirredReactor::takeStep() {
     calcDt();
 
     // Take substeps
-    // for (Particle& p : pvec) p.print();
+    // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     subStepInflow(dt_step);
-    // for (Particle& p : pvec) p.print();
+    // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     for (int isub = 0; isub < n_sub; isub++) {
         subStepMix(dt_sub);
-        // for (Particle& p : pvec) p.print();
+        // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
         subStepReact(dt_sub);
-        // for (Particle& p : pvec) p.print();
+        // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     }
-    // for (Particle& p : pvec) p.print();
+    // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
 
     // Increment counters
     incrementAge();
@@ -540,12 +540,6 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case CURL: {
-            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
-                                               "CURL not implemented.");
-            break;
-        }
-        case MOD_CURL: {
-            // TODO - currently assumes equal weight particles
             // Compute how many pairs to mix
             p_mix += n_particles * dt / tau_mix;
             int np_mix = std::round(p_mix);
@@ -553,14 +547,40 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 #pragma omp parallel
             {
                 int tid = omp_get_thread_num();
+                Particle pc;
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
                     double a = dists_uni_real[tid](rand_engines[tid]);
-                    pvec[ip1] += (1.0/2.0) * a * (pvec[ip2] - pvec[ip1]);
-                    pvec[ip2] += (1.0/2.0) * a * (pvec[ip1] - pvec[ip2]);
+                    pc = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
+                        (pvec[ip1].getMass() + pvec[ip2].getMass());
+                    pvec[ip1] = pc;
+                    pvec[ip2] = pc;
+                }
+            }
+            break;
+        }
+        case MOD_CURL: {
+            // Compute how many pairs to mix
+            p_mix += n_particles * dt / tau_mix;
+            int np_mix = std::round(p_mix);
+            p_mix -= np_mix;
+#pragma omp parallel
+            {
+                int tid = omp_get_thread_num();
+                Particle pc;
+#pragma omp for
+                // Iterate over pairs and mix
+                for (int ipair = 0; ipair < np_mix; ipair++) {
+                    unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
+                    unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
+                    double a = dists_uni_real[tid](rand_engines[tid]);
+                    pc = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
+                        (pvec[ip1].getMass() + pvec[ip2].getMass());
+                    pvec[ip1] += a * (pc - pvec[ip1]);
+                    pvec[ip2] += a * (pc - pvec[ip2]);
                 }
             }
             break;

@@ -54,6 +54,23 @@ public:
         return rhs;
     }
 
+    Particle operator/= (const double& rhs)& {
+        for (int iv = 0; iv < n_state_variables; iv++) {
+            xvec[iv] /= rhs;
+        }
+        return *this;
+    }
+
+    friend Particle operator/ (Particle lhs, const double& rhs) {
+        lhs /= rhs;
+        return lhs;
+    }
+
+    friend Particle operator/ (const double& lhs, Particle rhs) {
+        rhs /= lhs;
+        return rhs;
+    }
+
     double& P() {
         return *m_P;
     }
@@ -72,6 +89,10 @@ public:
 
     double& getTauRes() {
         return tau_res;
+    }
+
+    double& getMass() {
+        return mass;
     }
 
     int& getnRecycles() {
@@ -181,7 +202,7 @@ public:
         }
     }
 
-    void print(double threshold = 1.0e-14);
+    void print(double threshold = 1.0e-14, std::shared_ptr<Cantera::ThermoPhase> gas=nullptr);
 
     void react(Cantera::ReactorNet* rnet, double dt);
 
