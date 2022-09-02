@@ -143,6 +143,13 @@ void PartiallyStirredReactor::parseInput() {
     // Output
     check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(DEFAULT_CHECK_INTERVAL);
     std::cout << "> Output.check_interval = " << check_interval << std::endl;
+    std::vector<std::string> check_variable_names_ = config->get_qualified_array_of<std::string>("Output.check_variable_names").value_or(DEFAULT_CHECK_VARIABLE_NAMES);
+    if (check_variable_names_.size() > 0) {
+        check_variable_names.assign(check_variable_names_.begin(), check_variable_names_.end());
+        std::cout << "> Output.check_variable_names: ";
+        std::for_each(check_variable_names.begin(), check_variable_names.end(), [](std::string n){ std::cout << n << ", "; });
+        std::cout << std::endl;
+    }
     check_verbose = config->get_qualified_as<bool>("Output.check_verbose").value_or(DEFAULT_CHECK_VERBOSE);
     std::cout << "> Output.check_verbose = " << check_verbose << std::endl;
     write_interval = config->get_qualified_as<unsigned int>("Output.write_interval").value_or(DEFAULT_WRITE_INTERVAL);
@@ -362,18 +369,14 @@ void PartiallyStirredReactor::initialize() {
     n_derived_variables++;
 
     // Set check variables
-    iv_check.push_back(c_offset_h);
-    for (auto& k : i_fuel) {
-        iv_check.push_back(c_offset_Y + k);
-    }
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("O2"));
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("N2"));
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("CO"));
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("OH"));
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("CO2"));
-    iv_check.push_back(c_offset_Y + gasvec[0]->speciesIndex("H2O"));
-    for (int iv = 0; iv < n_derived_variables; iv++) {
-        iv_check.push_back(n_state_variables + iv);
+    if (check_variable_names.size() > 0) {
+        for (auto& name : check_variable_names) {
+            iv_check.push_back(variableIndex(name));
+        }
+    } else {
+        for (int iv = 0; iv < nVariables(); iv++) {
+            iv_check.push_back(iv);
+        }
     }
 }
 
@@ -413,7 +416,7 @@ void PartiallyStirredReactor::check() {
         std::left << std::setw(COL_WIDTH) << "Variance" <<
         std::left << std::setw(COL_WIDTH) << "Max" << std::endl;
     if (check_verbose) {
-        for (int iv = 0; iv < n_state_variables + n_derived_variables; iv++) {
+        for (int iv = 0; iv < nVariables(); iv++) {
             checkVariable(iv);
         }
     } else {
@@ -436,6 +439,15 @@ std::string PartiallyStirredReactor::variableName(int iv) {
     } else {
         return derived_variable_names[iv - n_state_variables];
     }
+}
+
+int PartiallyStirredReactor::variableIndex(std::string name) {
+    for (int iv = 0; iv < nVariables(); iv++) {
+        if (name == variableName(iv)) {
+            return iv;
+        }
+    }
+    throw std::runtime_error("PartiallyStirredReactor::variableIndex - variable " + name + " not found.");
 }
 
 void PartiallyStirredReactor::takeStep() {

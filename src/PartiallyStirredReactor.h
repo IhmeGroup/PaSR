@@ -37,6 +37,7 @@ const double DEFAULT_TAU_RES_CONSTANT = 1.0;
 const std::string DEFAULT_TAU_RES_HIST_NAME = "";
 const double DEFAULT_TAU_MIX = 1.0;
 const unsigned int DEFAULT_CHECK_INTERVAL = 1;
+const std::vector<std::string> DEFAULT_CHECK_VARIABLE_NAMES{};
 const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
 
@@ -54,6 +55,14 @@ public:
     void check();
 
     std::string variableName(int iv);
+    int variableIndex(std::string name);
+    int nVariables() { return n_state_variables + n_derived_variables; }
+
+    double mean(int iv, bool favre=true);
+    double variance(int iv, bool favre=true);
+    double variance(int iv, double meanval);
+    double min(int iv);
+    double max(int iv);
 
     double minState(int iv);
     void minState(std::vector<double>* minvec);
@@ -67,12 +76,6 @@ public:
     void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec);
     void histState(std::vector<double>* histvec, int iv);
     void histState(std::vector<std::vector<double>>* histvec);
-
-    double mean(int iv, bool favre=true);
-    double variance(int iv, bool favre=true);
-    double variance(int iv, double meanval);
-    double min(int iv);
-    double max(int iv);
 
 protected:
     void parseInput();
@@ -157,6 +160,7 @@ protected:
     std::vector<Injector> injvec;
     unsigned int n_species;
     unsigned int n_state_variables;
+    std::vector<unsigned int> i_fuel;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
     std::vector<double> xtemp1, xtemp2;
     std::vector<double> xmean_old, xvar_old;
@@ -166,15 +170,14 @@ protected:
     std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)>> variable_functions;
     std::vector<double> xtemp_derived;
 
-    std::vector<unsigned int> i_fuel;
-    std::vector<unsigned int> iv_check;
-
     std::vector<std::uniform_int_distribution<unsigned int>> dists_uni_int;
     std::vector<std::uniform_real_distribution<double>> dists_uni_real;
     std::vector<std::mt19937> rand_engines;
     double p_out, p_mix;
 
     unsigned int check_interval;
+    std::vector<std::string> check_variable_names;
+    std::vector<unsigned int> iv_check;
     bool check_verbose;
     unsigned int write_interval;
 
