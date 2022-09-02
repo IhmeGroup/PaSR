@@ -356,6 +356,12 @@ void PartiallyStirredReactor::initialize() {
             return pvec[ip].getAge(); });
     n_derived_variables++;
 
+    derived_variable_names.push_back("tau_res");
+    variable_functions.push_back(
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getTauRes(); });
+    n_derived_variables++;
+
     derived_variable_names.push_back("T");
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {

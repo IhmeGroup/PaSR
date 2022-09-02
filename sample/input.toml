@@ -30,6 +30,6 @@ tau_mix = 1.0e-4
 
 [Output]
 check_interval = 10
-check_variable_names = ["h", "Y_C2H4", "Y_O2", "Y_N2", "Y_CO", "Y_OH", "Y_CO2", "Y_H2O", "age", "T", "Z"]
+check_variable_names = ["h", "Y_C2H4", "Y_O2", "Y_N2", "Y_CO", "Y_OH", "Y_CO2", "Y_H2O", "age", "tau_res", "T", "Z"]
 check_verbose = false
 write_interval = 10
