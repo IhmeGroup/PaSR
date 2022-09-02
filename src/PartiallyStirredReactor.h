@@ -38,6 +38,7 @@ const std::string DEFAULT_TAU_RES_HIST_NAME = "";
 const double DEFAULT_TAU_MIX = 1.0;
 const unsigned int DEFAULT_CHECK_INTERVAL = 1;
 const bool DEFAULT_CHECK_VERBOSE = false;
+const int DEFAULT_WRITE_INTERVAL = -1;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
@@ -60,20 +61,28 @@ public:
     void maxState(std::vector<double>* maxvec);
     double meanState(int iv, bool favre=true);
     void meanState(std::vector<double>* xsumvec, bool favre=true);
-    double varState(int iv, bool favre=true);
-    void varState(std::vector<double>* xsumvec, bool favre=true);
+    double varianceState(int iv, bool favre=true);
+    double varianceState(int iv, double meanval);
+    void varianceState(std::vector<double>* xvarvec, bool favre=true);
+    void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec);
     void histState(std::vector<double>* histvec, int iv);
     void histState(std::vector<std::vector<double>>* histvec);
 
     double meanAge(bool favre=true);
+    double varianceAge(bool favre=true);
+    double varianceAge(double meanval);
     double minAge();
     double maxAge();
 
     double meanT(bool favre=true);
+    double varianceT(bool favre=true);
+    double varianceT(double meanval);
     double minT();
     double maxT();
 
     double meanZ(bool favre=true);
+    double varianceZ(bool favre=true);
+    double varianceZ(double meanval);
     double minZ();
     double maxZ();
 
@@ -88,6 +97,7 @@ protected:
     void calcConvergence();
     bool runDone();
     void copyState();
+    void writeStats();
 
     void checkVar(int iv);
 
@@ -100,8 +110,8 @@ protected:
     double mean(std::function<double(int)> xfunc, bool favre=true);
     double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
 
-    double var(std::function<double(int)> xfunc, bool favre=true);
-    double var(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
+    double variance(std::function<double(int)> xfunc, bool favre=true);
+    double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool favre);
 
     void hist(std::vector<double>* histvec, std::function<double(int)> xfunc);
     void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc);
@@ -169,8 +179,8 @@ protected:
     unsigned int nsp;
     unsigned int nv;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
-    std::vector<double> xtemp;
-    std::vector<double> xmean_old;
+    std::vector<double> xtemp1, xtemp2;
+    std::vector<double> xmean_old, xvar_old;
 
     std::vector<unsigned int> i_fuel;
     std::vector<unsigned int> iv_check;
@@ -182,6 +192,7 @@ protected:
 
     unsigned int check_interval;
     bool check_verbose;
+    unsigned int write_interval;
 
 private:
     
