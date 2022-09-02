@@ -683,7 +683,7 @@ void PartiallyStirredReactor::writeStats() {
 double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return minval;
@@ -694,7 +694,7 @@ void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
     // Min across particles
     std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
 #pragma omp parallel for reduction(vec_double_min:minvec_temp)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
         }
@@ -709,7 +709,7 @@ void PartiallyStirredReactor::minState(std::vector<double>* minvec) {
 double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc) {
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip));
     }
     return maxval;
@@ -720,7 +720,7 @@ void PartiallyStirredReactor::maxState(std::vector<double>* maxvec) {
     // Max across particles
     std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
 #pragma omp parallel for reduction(vec_double_max:maxvec_temp)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
         }
@@ -736,7 +736,7 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
     double rhosum = 0.0;
     double xsum = 0.0;
 #pragma omp parallel for reduction(+:rhosum,xsum)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         double rho = 0.0;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -755,7 +755,7 @@ void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool favr
     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
     double rhosum = 0.0;
 #pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         double rho;
         if (favre) {
             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
@@ -778,7 +778,7 @@ double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Ca
     double meanval = mean(xfunc, favre);
     double varsum = 0.0;
 #pragma omp parallel for reduction(+:varsum)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip) - meanval), 2.0);
     }
     return varsum / n_particles;
@@ -791,7 +791,7 @@ void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, bool f
     meanState(&xmeanvec, favre);
     std::vector<double> xsumvec(xvarvec->size(), 0.0);
 #pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xsumvec[iv] += std::pow((pvec[ip].state(iv) - xmeanvec[iv]), 2.0);
         }
@@ -808,7 +808,7 @@ void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, std::v
     // Sum across particles
     std::vector<double> xsumvec(xvarvec->size(), 0.0);
 #pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles * i_stat; ip++) {
+    for (int ip = 0; ip < n_particles * n_stat; ip++) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xsumvec[iv] += std::pow((pvec[ip].state(iv) - (*xmeanvec)[iv]), 2.0);
         }

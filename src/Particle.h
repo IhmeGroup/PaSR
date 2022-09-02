@@ -13,26 +13,6 @@ public:
     explicit Particle();
     ~Particle();
 
-    // Particle operator= (const Particle& rhs) {
-    //     for (int iv = 0; iv < n_state_variables; iv++) {
-    //         xvec[iv] = rhs.xvec[iv];
-    //     }
-    //     return *this;
-    // }
-
-    // Particle copyAll(const Particle& rhs) {
-    //     for (int iv = 0; iv < n_state_variables; iv++) {
-    //         xvec[iv] = rhs.xvec[iv];
-    //     }
-    //     index = rhs.index;
-    //     m_P = rhs.m_P;
-    //     age = rhs.age;
-    //     mass = rhs.mass;
-    //     tau_res = rhs.tau_res;
-    //     n_recycles = rhs.n_recycles;
-    //     return *this;
-    // }
-
     Particle operator+= (const Particle& rhs)& {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] += rhs.xvec[iv];

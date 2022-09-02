@@ -58,23 +58,18 @@ public:
     int variableIndex(std::string name);
     int nVariables() { return n_state_variables + n_derived_variables; }
 
+    double min(int iv);
+    double max(int iv);
     double mean(int iv, bool favre=true);
     double variance(int iv, bool favre=true);
     double variance(int iv, double meanval);
-    double min(int iv);
-    double max(int iv);
+    void hist(std::vector<double>* histvec, int iv);
 
-    double minState(int iv);
     void minState(std::vector<double>* minvec);
-    double maxState(int iv);
     void maxState(std::vector<double>* maxvec);
-    double meanState(int iv, bool favre=true);
     void meanState(std::vector<double>* xsumvec, bool favre=true);
-    double varianceState(int iv, bool favre=true);
-    double varianceState(int iv, double meanval);
     void varianceState(std::vector<double>* xvarvec, bool favre=true);
     void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec);
-    void histState(std::vector<double>* histvec, int iv);
     void histState(std::vector<std::vector<double>>* histvec);
 
 protected:
