@@ -347,9 +347,20 @@ void PartiallyStirredReactor::initialize() {
     std::cout << "Done initializing particles." << std::endl;
 
     // Read restart
-    std::cout << "Reading restart..." << std::endl;
-    readRestart();
-    std::cout << "Done reading restart." << std::endl;
+    if (restart) {
+        std::cout << "Reading restart..." << std::endl;
+        readRestart();
+
+        // Copy restart to all old particles to initialize stats properly
+#pragma omp parallel for
+        for (int ip = 0; ip < n_particles; ip++) {
+            for (int is = 1; is < n_stat; is++) {
+                pvec[ip + is*n_particles] = pvec[ip];
+            }
+        }
+        
+        std::cout << "Done reading restart." << std::endl;
+    }
 
     // Initialize injectors
     for (int iinj = 0; iinj < 2; iinj++) {
@@ -458,6 +469,12 @@ void PartiallyStirredReactor::readRestart() {
                 std::getline(file, line); // Advance by 1 line
                 ip--; // Decrement ip so this particle is not skipp
             }
+        }
+
+        // Warn about extra particles
+        if (std::getline(file, line)) {
+            std::cout << "WARNING: More particles than necessary specified in restart file. " << 
+                "Only reading first " << n_particles << "particle(s)." << std::endl;
         }
     } else {
         std::runtime_error("Histogram::readHist - could not open " + restart_filename + ".");
