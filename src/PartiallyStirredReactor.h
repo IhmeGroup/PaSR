@@ -15,6 +15,8 @@
 #include "Particle.h"
 
 const std::string DEFAULT_MECH_NAME = "";
+const bool DEFAULT_RESTART = false;
+const std::string DEFAULT_RESTART_NAME = "";
 const int DEFAULT_N_PARTICLES = 100;
 const int DEFAULT_N_STEPS = -1;
 const double DEFAULT_T_STOP = -1.0;
@@ -64,7 +66,7 @@ public:
 
     std::string variableName(int iv);
     int variableIndex(std::string name);
-    int nVariables() { return n_state_variables + n_derived_variables; }
+    int nVariables() { return n_state_variables + n_aux_variables + n_derived_variables; }
 
     double min(int iv, bool all=false);
     double max(int iv, bool all=false);
@@ -82,6 +84,7 @@ public:
 
 protected:
     void parseInput();
+    void readRestart();
     void takeStep();
     void calcDt();
     void subStepInflow(double dt);
@@ -134,6 +137,8 @@ protected:
 
     std::string input_filename;
     std::string mech_filename;
+    bool restart;
+    std::string restart_filename;
     unsigned int n_particles;
     int n_steps;
     int n_substeps;
@@ -168,14 +173,13 @@ protected:
     std::vector<Particle> pvec;
     std::vector<Injector> injvec;
     unsigned int n_species;
-    unsigned int n_state_variables;
+    unsigned int n_state_variables, n_aux_variables, n_derived_variables;
     std::vector<unsigned int> i_fuel;
     std::vector<double> Y_fuel, Y_ox, Y_phi;
     std::vector<double> xtemp1, xtemp2;
     std::vector<double> xmean_old, xvar_old;
 
-    int n_derived_variables;
-    std::vector<std::string> derived_variable_names;
+    std::vector<std::string> aux_variable_names, derived_variable_names;
     std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)>> variable_functions;
     std::vector<double> xtemp_derived;
 

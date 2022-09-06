@@ -20,7 +20,8 @@ namespace fs = std::filesystem;
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
-    step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0), n_state_variables(0), n_derived_variables(0), n_species(0)
+    step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0),
+    n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0)
 {
     parseInput();
 }
@@ -34,6 +35,14 @@ void PartiallyStirredReactor::parseInput() {
     // Mechanism
     mech_filename = config->get_qualified_as<std::string>("Mechanism.name").value_or(DEFAULT_MECH_NAME);
     std::cout << "> Mechanism.name = " << mech_filename << std::endl;
+
+    // Initialization
+    restart = config->get_qualified_as<bool>("Initialization.restart").value_or(DEFAULT_RESTART);
+    std::cout << "> Initialization.restart = " << restart << std::endl;
+    if (restart) {
+        restart_filename = config->get_qualified_as<std::string>("Initialization.name").value_or(DEFAULT_RESTART_NAME);
+        std::cout << "> Initialization.name = " << restart_filename << std::endl;
+    }
 
     // Numerics
     n_particles = config->get_qualified_as<unsigned int>("Numerics.n_particles").value_or(DEFAULT_N_PARTICLES);
@@ -151,7 +160,8 @@ void PartiallyStirredReactor::parseInput() {
     // Output
     check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(DEFAULT_CHECK_INTERVAL);
     std::cout << "> Output.check_interval = " << check_interval << std::endl;
-    std::vector<std::string> check_variable_names_ = config->get_qualified_array_of<std::string>("Output.check_variable_names").value_or(DEFAULT_CHECK_VARIABLE_NAMES);
+    std::vector<std::string> check_variable_names_ = config->get_qualified_array_of<std::string>(
+        "Output.check_variable_names").value_or(DEFAULT_CHECK_VARIABLE_NAMES);
     if (check_variable_names_.size() > 0) {
         check_variable_names.assign(check_variable_names_.begin(), check_variable_names_.end());
         std::cout << "> Output.check_variable_names: ";
@@ -336,6 +346,11 @@ void PartiallyStirredReactor::initialize() {
     }
     std::cout << "Done initializing particles." << std::endl;
 
+    // Read restart
+    std::cout << "Reading restart..." << std::endl;
+    readRestart();
+    std::cout << "Done reading restart." << std::endl;
+
     // Initialize injectors
     for (int iinj = 0; iinj < 2; iinj++) {
         injvec.push_back(Injector(iinj, n_species));
@@ -362,19 +377,26 @@ void PartiallyStirredReactor::initialize() {
                 return pvec[ip].state(iv); });
     }
 
-    // Initialize derived variables
-    derived_variable_names.push_back("age");
+    // Initialize auxiliary variables
+    aux_variable_names.push_back("age");
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getAge(); });
-    n_derived_variables++;
+    n_aux_variables++;
 
-    derived_variable_names.push_back("tau_res");
+    aux_variable_names.push_back("tau_res");
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getTauRes(); });
-    n_derived_variables++;
+    n_aux_variables++;
 
+    aux_variable_names.push_back("mass");
+    variable_functions.push_back(
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getMass(); });
+    n_aux_variables++;
+
+    // Initialize derived variables
     derived_variable_names.push_back("T");
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
@@ -405,6 +427,41 @@ void PartiallyStirredReactor::initialize() {
     // Initialize output files
     writeRawHeaders();
     writeStatsHeaders();
+}
+
+void PartiallyStirredReactor::readRestart() {
+    std::string line, word;
+    std::ifstream file(restart_filename);
+    std::vector<int> iv_read;
+    if (file.is_open()) {
+
+        std::stringstream str(line);
+
+        // Read header
+        std::getline(file, line);
+        while (std::getline(str, word, ',')) {
+            iv_read.push_back(variableIndex(word));
+        }
+
+        // Read content
+        for (int ip = 0; ip < n_particles; ip++) {
+            if (std::getline(file, line)) {
+                for (int iiv = 0; iiv < iv_read.size(); iiv++) {
+                    if (iv_read[iiv] >= n_state_variables + n_aux_variables) continue;
+                    std::getline(str, word, ',');
+                    pvec[ip].stateAux(iv_read[iiv]) = std::stod(word);
+                }
+            } else {
+                std::cout << "WARNING: Only " << ip+1 << " particle(s) specified in restart file. Repeating read." << std::endl;
+                file.clear(); // Reset eof and fail flags
+                file.seekg(0); // Go to beginning of file
+                std::getline(file, line); // Advance by 1 line
+                ip--; // Decrement ip so this particle is not skipp
+            }
+        }
+    } else {
+        std::runtime_error("Histogram::readHist - could not open " + restart_filename + ".");
+    }
 }
 
 void PartiallyStirredReactor::run() {
@@ -465,8 +522,10 @@ std::string PartiallyStirredReactor::variableName(int iv) {
     } else if (iv < n_state_variables) {
         std::string prefix = "Y_";
         return prefix + gasvec[0]->speciesName(iv-c_offset_Y);
+    } else if (iv < n_state_variables + n_aux_variables) {
+        return aux_variable_names[iv - n_state_variables];
     } else {
-        return derived_variable_names[iv - n_state_variables];
+        return derived_variable_names[iv - n_state_variables - n_aux_variables];
     }
 }
 

@@ -1,6 +1,10 @@
 [Mechanism]
 name = "./gri30.yaml"
 
+[Initialization]
+restart = true
+name = "particle_data.csv"
+
 [Numerics]
 n_particles = 100
 # n_steps = 10

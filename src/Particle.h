@@ -7,6 +7,9 @@
 
 const int c_offset_h = 0; // enthalpy
 const int c_offset_Y = 1; // mass fraction
+const int c_offset_age = 0;
+const int c_offset_tau_res = 1;
+const int c_offset_mass = 2;
 
 class Particle {
 public:
@@ -81,6 +84,19 @@ public:
 
     double& state(int i) {
         return xvec[i];
+    }
+
+    double& stateAux(int i) {
+        if (i < n_state_variables) {
+            return state(i);
+        } else {
+            switch (i - n_state_variables) {
+                case c_offset_age: return getAge();
+                case c_offset_tau_res: return getTauRes();
+                case c_offset_mass: return getMass();
+            }
+        }
+        throw Cantera::CanteraError("Particle::stateAux", "Invalid index");
     }
 
     double& getAge() {

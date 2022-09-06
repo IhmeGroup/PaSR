@@ -78,7 +78,7 @@ void Histogram::readHist(std::string hist_filename) {
     std::string line, word;
     std::ifstream file(hist_filename);
     if (file.is_open()) {
-        while (getline(file, line)) {
+        while (std::getline(file, line)) {
             std::stringstream str(line);
 
             std::getline(str, word, ',');
