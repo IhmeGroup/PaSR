@@ -126,6 +126,8 @@ void PartiallyStirredReactor::parseInput() {
         throw(0);
     }
     std::cout << "> Conditions.injection_mode = " << injectionModeString(injection_mode) << std::endl;
+    pilot_flow = config->get_qualified_as<double>("Conditions.pilot_flow").value_or(DEFAULT_PILOT_FLOW);
+    std::cout << "> Conditions.pilot_flow = " << pilot_flow << std::endl;
     P = config->get_qualified_as<double>("Conditions.pressure").value_or(DEFAULT_PRESSURE);
     std::cout << "> Conditions.pressure = " << P << std::endl;
     comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or(DEFAULT_COMP_FUEL);
@@ -357,30 +359,35 @@ void PartiallyStirredReactor::initialize() {
     std::cout << "Done initializing particles." << std::endl;
 
     // Initialize injectors
+    injvec.push_back(Injector(0, n_species));
+    injvec[0].seth(h_equil);
+    injvec[0].setY(Y_equil.data());
+    injvec[0].setFlow(pilot_flow);
+
     switch (injection_mode) {
         case PREMIXED: {
-            injvec.push_back(Injector(0, n_species));
+            injvec.push_back(Injector(1, n_species));
 
             // Premix injector
-            injvec[0].seth(h_mix);
-            injvec[0].setY(Y_mix.data());
-            injvec[0].setFlow(1.0);
+            injvec[1].seth(h_mix);
+            injvec[1].setY(Y_mix.data());
+            injvec[1].setFlow(1.0 - pilot_flow);
             break;
         }
         case NONPREMIXED: {
-            for (int iinj = 0; iinj < 2; iinj++) {
+            for (int iinj = 1; iinj < 3; iinj++) {
                 injvec.push_back(Injector(iinj, n_species));
             }
 
             // Fuel injector
-            injvec[0].seth(h_fuel);
-            injvec[0].setY(Y_fuel.data());
-            injvec[0].setFlow(Zeq);
+            injvec[1].seth(h_fuel);
+            injvec[1].setY(Y_fuel.data());
+            injvec[1].setFlow(Zeq * (1.0-pilot_flow));
 
             // Oxidizer injector
-            injvec[1].seth(h_ox);
-            injvec[1].setY(Y_ox.data());
-            injvec[1].setFlow(1-Zeq);
+            injvec[2].seth(h_ox);
+            injvec[2].setY(Y_ox.data());
+            injvec[2].setFlow((1-Zeq) * (1.0-pilot_flow));
             break;
         }
         default: {

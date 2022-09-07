@@ -29,6 +29,7 @@ const double DEFAULT_RTOL = -1.0;
 const int DEFAULT_MIN_STEPS_CONVERGE = -1;
 const std::string DEFAULT_MIX_MODEL = "FULL_MIX";
 const std::string DEFAULT_INJECTION_MODE = "NONPREMIXED";
+const double DEFAULT_PILOT_FLOW = 0.0;
 const double DEFAULT_PRESSURE = 101325.0;
 const std::string DEFAULT_COMP_FUEL = "";
 const std::string DEFAULT_COMP_OX = "";
@@ -166,6 +167,7 @@ protected:
     unsigned int step;
     MixingModel mixing_model;
     InjectionMode injection_mode;
+    double pilot_flow;
     double P;
     std::string comp_fuel, comp_ox;
     double T_fuel, T_ox, T_mix;
