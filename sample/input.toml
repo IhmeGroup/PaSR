@@ -2,7 +2,7 @@
 name = "./gri30.yaml"
 
 [Initialization]
-restart = true
+restart = false
 name = "restart.csv"
 p_stoich = 0.6
 

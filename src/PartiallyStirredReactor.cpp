@@ -1,5 +1,4 @@
 #include <fstream>
-#include <filesystem>
 #include <iomanip>
 #include <cmath>
 #include <limits>
@@ -13,9 +12,11 @@
 #include "PartiallyStirredReactor.h"
 
 #ifdef __APPLE__
+#include <filesystem>
 namespace fs = std::__fs::filesystem;
 #else
-namespace fs = std::filesystem;
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
 #endif
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :

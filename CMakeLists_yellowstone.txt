@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.15)
 set(TARGET_NAME pasr)
 project(${TARGET_NAME})
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated")
@@ -51,5 +51,6 @@ if(OpenMP_CXX_FOUND)
         sundials_cvodes
         sundials_ida
         sundials_nvecserial
-        OpenMP::OpenMP_CXX)
+        OpenMP::OpenMP_CXX
+        stdc++fs)
 endif()
