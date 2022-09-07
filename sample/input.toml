@@ -2,12 +2,12 @@
 name = "./gri30.yaml"
 
 [Initialization]
-restart = false
+restart = true
 name = "restart.csv"
 p_stoich = 0.6
 
 [Numerics]
-n_particles = 10
+n_particles = 100
 # n_steps = 10
 t_stop = 1.0e-2
 # dt = 1.0e-6

@@ -34,6 +34,7 @@ public:
     }
 
     double& getFlow() {
+        // TODO - distinguish between mass flow and particle flow
         return flow;
     }
 
