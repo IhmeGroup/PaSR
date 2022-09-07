@@ -112,6 +112,20 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "> Models.mixing_model = " << mixingModelString(mixing_model) << std::endl;
 
     // Conditions
+    std::string injection_mode_str =
+        config->get_qualified_as<std::string>("Conditions.injection_mode").value_or(DEFAULT_INJECTION_MODE);
+    if (injection_mode_str == "PREMIXED") {
+        injection_mode = PREMIXED;
+    } else if (injection_mode_str == "NONPREMIXED") {
+        injection_mode = NONPREMIXED;
+    } else {
+        std::cerr <<
+          "Invalid injection mode: " +
+          injection_mode_str +
+          ". Must be PREMIXED or NONPREMIXED." << std::endl;
+        throw(0);
+    }
+    std::cout << "> Conditions.injection_mode = " << injectionModeString(injection_mode) << std::endl;
     P = config->get_qualified_as<double>("Conditions.pressure").value_or(DEFAULT_PRESSURE);
     std::cout << "> Conditions.pressure = " << P << std::endl;
     comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or(DEFAULT_COMP_FUEL);
@@ -122,8 +136,6 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "> Conditions.T_fuel = " << T_fuel << std::endl;
     T_ox = config->get_qualified_as<double>("Conditions.T_ox").value_or(DEFAULT_T_OX);
     std::cout << "> Conditions.T_ox = " << T_ox << std::endl;
-    T_init = config->get_qualified_as<double>("Conditions.T_init").value_or(DEFAULT_T_INIT);
-    std::cout << "> Conditions.T_init = " << T_init << std::endl;
     phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(DEFAULT_PHI_GLOBAL);
     std::cout << "> Conditions.phi_global = " << phi_global << std::endl;
     std::string tau_res_mode_str = config->get_qualified_as<std::string>("Conditions.tau_res_mode").value_or(DEFAULT_TAU_RES_MODE);
@@ -259,7 +271,7 @@ void PartiallyStirredReactor::initialize() {
     xvar_old.resize(n_state_variables);
     Y_fuel.resize(n_species);
     Y_ox.resize(n_species);
-    Y_phi.resize(n_species);
+    Y_mix.resize(n_species);
 
     // Get compositions
     gasvec[0]->setState_TPX(T_fuel, P, comp_fuel);
@@ -274,11 +286,13 @@ void PartiallyStirredReactor::initialize() {
     gasvec[0]->getMassFractions(Y_ox.data());
     h_ox = gasvec[0]->enthalpy_mass();
     gasvec[0]->setEquivalenceRatio(phi_global, comp_fuel, comp_ox);
-    gasvec[0]->getMassFractions(Y_phi.data());
+    gasvec[0]->getMassFractions(Y_mix.data());
     double Zeq = gasvec[0]->mixtureFraction(comp_fuel, comp_ox);
+    h_mix = h_fuel * Zeq + h_ox * (1 - Zeq);
 
     // Compute equilibrium state (for initialization)
-    gasvec[0]->setState_TPY(T_init, P, Y_phi.data());
+    gasvec[0]->setState_PY(P, Y_mix.data());
+    gasvec[0]->setState_HP(h_mix, P);
     gasvec[0]->equilibrate("HP");
     double T_equil = gasvec[0]->temperature();
     double h_equil = gasvec[0]->enthalpy_mass();
@@ -343,19 +357,37 @@ void PartiallyStirredReactor::initialize() {
     std::cout << "Done initializing particles." << std::endl;
 
     // Initialize injectors
-    for (int iinj = 0; iinj < 2; iinj++) {
-        injvec.push_back(Injector(iinj, n_species));
+    switch (injection_mode) {
+        case PREMIXED: {
+            injvec.push_back(Injector(0, n_species));
+
+            // Premix injector
+            injvec[0].seth(h_mix);
+            injvec[0].setY(Y_mix.data());
+            injvec[0].setFlow(1.0);
+            break;
+        }
+        case NONPREMIXED: {
+            for (int iinj = 0; iinj < 2; iinj++) {
+                injvec.push_back(Injector(iinj, n_species));
+            }
+
+            // Fuel injector
+            injvec[0].seth(h_fuel);
+            injvec[0].setY(Y_fuel.data());
+            injvec[0].setFlow(Zeq);
+
+            // Oxidizer injector
+            injvec[1].seth(h_ox);
+            injvec[1].setY(Y_ox.data());
+            injvec[1].setFlow(1-Zeq);
+            break;
+        }
+        default: {
+            throw Cantera::CanteraError("PartiallyStirredReactor::subStepMix",
+                                        "Invalid mixing model.");
+        }
     }
-
-    // Fuel injector
-    injvec[0].seth(h_fuel);
-    injvec[0].setY(Y_fuel.data());
-    injvec[0].setFlow(Zeq);
-
-    // Oxidizer injector
-    injvec[1].seth(h_ox);
-    injvec[1].setY(Y_ox.data());
-    injvec[1].setFlow(1-Zeq);
 
     for (Injector& inj : injvec) {
         inj.print();

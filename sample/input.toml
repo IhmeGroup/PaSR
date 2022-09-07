@@ -21,12 +21,13 @@ min_steps_converge = 100
 mixing_model = "IEM"
 
 [Conditions]
+injection_mode = "NONPREMIXED"
+pilot_flow = 0.05
 pressure = 101325.0
 comp_fuel = "CH4:1.0"
 comp_ox = "O2:0.21,N2:0.79"
 T_fuel = 500.0
 T_ox = 1800.0
-T_init = 1800.0
 phi_global = 1.0
 tau_res_mode = "DISTRIBUTION"
 # tau_res = 1.0e-3
@@ -35,7 +36,7 @@ tau_mix = 1.0e-4
 
 [Output]
 check_interval = 10
-check_variable_names = ["h", "Y_C2H4", "Y_O2", "Y_N2", "Y_CO", "Y_OH", "Y_CO2", "Y_H2O", "age", "tau_res", "T", "Z"]
+check_variable_names = ["h", "Y_CH4", "Y_O2", "Y_N2", "Y_CO", "Y_OH", "Y_CO2", "Y_H2O", "age", "tau_res", "T", "Z"]
 check_verbose = false
 write_raw_interval = 10
 write_stats_interval = 10

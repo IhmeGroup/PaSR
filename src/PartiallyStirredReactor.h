@@ -28,6 +28,7 @@ const int DEFAULT_STATS_WINDOW = 1;
 const double DEFAULT_RTOL = -1.0;
 const int DEFAULT_MIN_STEPS_CONVERGE = -1;
 const std::string DEFAULT_MIX_MODEL = "FULL_MIX";
+const std::string DEFAULT_INJECTION_MODE = "NONPREMIXED";
 const double DEFAULT_PRESSURE = 101325.0;
 const std::string DEFAULT_COMP_FUEL = "";
 const std::string DEFAULT_COMP_OX = "";
@@ -45,6 +46,7 @@ const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
+enum InjectionMode {PREMIXED, NONPREMIXED};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
 enum TauResMode {CONSTANT, DISTRIBUTION};
 
@@ -111,7 +113,7 @@ protected:
     void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
 
     std::string convergenceMetricString(ConvergenceMetric convergence_metric_) {
-        switch(convergence_metric_) {
+        switch (convergence_metric_) {
             case MEAN: return "MEAN";
             case MEAN_VAR: return "MEAN_VAR";
             case HIST: return "HIST";
@@ -119,7 +121,7 @@ protected:
     }
 
     std::string mixingModelString(MixingModel mixing_model_) {
-        switch(mixing_model_) {
+        switch (mixing_model_) {
             case NO_MIX: return "NO_MIX";
             case FULL_MIX: return "FULL_MIX";
             case CURL: return "CURL";
@@ -129,8 +131,15 @@ protected:
         }
     }
 
+    std::string injectionModeString(InjectionMode injection_mode_) {
+        switch (injection_mode_) {
+            case PREMIXED: return "PREMIXED";
+            case NONPREMIXED: return "NONPREMIXED";
+        }
+    }
+
     std::string tauResModeString(TauResMode tau_res_mode_) {
-        switch(tau_res_mode_) {
+        switch (tau_res_mode_) {
             case CONSTANT: return "CONSTANT";
             case DISTRIBUTION: return "DISTRIBUTION";
         }
@@ -156,10 +165,11 @@ protected:
     double t;
     unsigned int step;
     MixingModel mixing_model;
+    InjectionMode injection_mode;
     double P;
     std::string comp_fuel, comp_ox;
-    double T_fuel, T_ox, T_init;
-    double h_fuel, h_ox;
+    double T_fuel, T_ox, T_mix;
+    double h_fuel, h_ox, h_mix;
     double phi_global;
     TauResMode tau_res_mode;
     double tau_res_constant;
@@ -177,7 +187,7 @@ protected:
     unsigned int n_species;
     unsigned int n_state_variables, n_aux_variables, n_derived_variables;
     std::vector<unsigned int> i_fuel;
-    std::vector<double> Y_fuel, Y_ox, Y_phi;
+    std::vector<double> Y_fuel, Y_ox, Y_mix;
     std::vector<double> xtemp1, xtemp2;
     std::vector<double> xmean_old, xvar_old;
 
