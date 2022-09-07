@@ -91,7 +91,7 @@ void Histogram::readHist(std::string hist_filename) {
             }
         }
     } else {
-        std::runtime_error("Histogram::readHist - could not open " + hist_filename + ".");
+        throw std::runtime_error("Histogram::readHist - could not open " + hist_filename + ".");
     }
 }
 

@@ -457,7 +457,7 @@ void PartiallyStirredReactor::readRestart() {
                 "Only reading first " << n_particles << "particle(s)." << std::endl;
         }
     } else {
-        std::runtime_error("Histogram::readHist - could not open " + restart_filename + ".");
+        throw std::runtime_error("PartiallyStirredReactor::readRestart - could not open " + restart_filename + ".");
     }
 }
 
