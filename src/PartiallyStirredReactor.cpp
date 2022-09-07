@@ -43,6 +43,8 @@ void PartiallyStirredReactor::parseInput() {
         restart_filename = config->get_qualified_as<std::string>("Initialization.name").value_or(DEFAULT_RESTART_NAME);
         std::cout << "> Initialization.name = " << restart_filename << std::endl;
     }
+    p_stoich = config->get_qualified_as<double>("Initialization.p_stoich").value_or(DEFAULT_P_STOICH);
+    std::cout << "> Initialization.p_stoich = " << p_stoich << std::endl;
 
     // Numerics
     n_particles = config->get_qualified_as<unsigned int>("Numerics.n_particles").value_or(DEFAULT_N_PARTICLES);
@@ -153,9 +155,6 @@ void PartiallyStirredReactor::parseInput() {
     }
     tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(DEFAULT_TAU_MIX);
     std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
-
-    // Initialization
-    // TODO - various initialization methods
 
     // Output
     check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(DEFAULT_CHECK_INTERVAL);
@@ -277,28 +276,6 @@ void PartiallyStirredReactor::initialize() {
     gasvec[0]->getMassFractions(Y_phi.data());
     double Zeq = gasvec[0]->mixtureFraction(comp_fuel, comp_ox);
 
-    // // Compute effective C and H numbers in fuel
-    // gasvec[0]->setState_TPX(T_fuel, P, comp_fuel);
-    // double C_eff = 0.0;
-    // double H_eff = 0.0;
-    // int iC = gasvec[0]->elementIndex("C");
-    // int iH = gasvec[0]->elementIndex("H");
-    // for (size_t k = 0; k < n_species; k++) {
-    //     C_eff += gasvec[0]->moleFraction(k) * gasvec[0]->nAtoms(k, iC);
-    //     H_eff += gasvec[0]->moleFraction(k) * gasvec[0]->nAtoms(k, iH);
-    // }
-
-    // // Compute stoichiometric fuel/air ratio
-    // double s = 32.0 * (C_eff + (H_eff/4.0)) / (12.0*C_eff + H_eff);
-    // double YFF = 0.0;
-    // for (int k = 0; k < n_species; k++) {
-    //     if (Y_fuel[k] > 1.0e-3) {
-    //         YFF += Y_fuel[k];
-    //     }
-    // }
-    // double YOO = Y_ox[gasvec[0]->speciesIndex("O2")];
-    // double S = s * YFF / YOO;
-
     // Compute equilibrium state (for initialization)
     gasvec[0]->setState_TPY(T_init, P, Y_phi.data());
     gasvec[0]->equilibrate("HP");
@@ -309,17 +286,29 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize particles
     std::cout << "Initializing particles..." << std::endl;
+    int np_stoich = std::round(p_stoich * n_particles);
+
 #pragma omp parallel
     {
         int tid = omp_get_thread_num();
 #pragma omp for
-        for (int ip = 0; ip < n_particles * n_stat; ip++) {
+        for (int ip = 0; ip < n_particles; ip++) {
             pvec[ip].setP(&P);
             pvec[ip].setIndex(ip);
             pvec[ip].setnSpecies(n_species);
             pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
-            pvec[ip].seth(h_equil);
-            pvec[ip].setY(Y_equil.data());
+
+            if (ip < np_stoich) {
+                pvec[ip].seth(h_equil);
+                pvec[ip].setY(Y_equil.data());
+            } else {
+                double Z = dists_uni_real[tid](rand_engines[tid]);
+                gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
+                gasvec[tid]->equilibrate("HP");
+                pvec[ip].seth(gasvec[tid]->enthalpy_mass());
+                pvec[ip].setY(gasvec[tid]->massFractions());
+            }
+
             switch (tau_res_mode) {
                 case CONSTANT: {
                     pvec[ip].setAge(dists_uni_real[tid](rand_engines[tid]) * tau_res_constant);
@@ -332,35 +321,25 @@ void PartiallyStirredReactor::initialize() {
                     break;
                 }
             }
-            // if (ip <= (n_particles-1) / 2.0) {
-            //     pvec[ip].setAge(0.0);
-            //     pvec[ip].seth(h_fuel);
-            //     pvec[ip].setY(Y_fuel.data());
-            // } else {
-            //     pvec[ip].setAge(1.0);
-            //     pvec[ip].seth(h_ox);
-            //     pvec[ip].setY(Y_ox.data());
-            // }
-            // pvec[ip].print();
         }
     }
-    std::cout << "Done initializing particles." << std::endl;
 
     // Read restart
     if (restart) {
         std::cout << "Reading restart..." << std::endl;
         readRestart();
-
-        // Copy restart to all old particles to initialize stats properly
-#pragma omp parallel for
-        for (int ip = 0; ip < n_particles; ip++) {
-            for (int is = 1; is < n_stat; is++) {
-                pvec[ip + is*n_particles] = pvec[ip];
-            }
-        }
         
         std::cout << "Done reading restart." << std::endl;
     }
+
+    // Copy state to all old particles to initialize stats properly
+#pragma omp parallel for
+    for (int ip = 0; ip < n_particles; ip++) {
+        for (int is = 1; is < n_stat; is++) {
+            pvec[ip + is*n_particles] = pvec[ip];
+        }
+    }
+    std::cout << "Done initializing particles." << std::endl;
 
     // Initialize injectors
     for (int iinj = 0; iinj < 2; iinj++) {
@@ -736,10 +715,6 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
     pvec[ip].seth(injvec[iinj].h());
     pvec[ip].setY(injvec[iinj].Y().data());
     pvec[ip].getnRecycles()++;
-    // std::cout << "Recycling particle " << ip
-    //     << " to injector " << iinj
-    //     << " (p_inj = " << p_inj << ")" << std::endl;
-    // pvec[ip].print();
 }
 
 void PartiallyStirredReactor::calcConvergence() {

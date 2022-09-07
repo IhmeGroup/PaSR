@@ -17,6 +17,7 @@
 const std::string DEFAULT_MECH_NAME = "";
 const bool DEFAULT_RESTART = false;
 const std::string DEFAULT_RESTART_NAME = "";
+const double DEFAULT_P_STOICH = 0.6;
 const int DEFAULT_N_PARTICLES = 100;
 const int DEFAULT_N_STEPS = -1;
 const double DEFAULT_T_STOP = -1.0;
@@ -139,6 +140,7 @@ protected:
     std::string mech_filename;
     bool restart;
     std::string restart_filename;
+    double p_stoich;
     unsigned int n_particles;
     int n_steps;
     int n_substeps;
