@@ -45,8 +45,8 @@ void PartiallyStirredReactor::parseInput() {
         restart_filename = config->get_qualified_as<std::string>("Initialization.name").value_or(DEFAULT_RESTART_NAME);
         std::cout << "> Initialization.name = " << restart_filename << std::endl;
     }
-    p_stoich = config->get_qualified_as<double>("Initialization.p_stoich").value_or(DEFAULT_P_STOICH);
-    std::cout << "> Initialization.p_stoich = " << p_stoich << std::endl;
+    p_phi_equil = config->get_qualified_as<double>("Initialization.p_phi_equil").value_or(DEFAULT_P_STOICH);
+    std::cout << "> Initialization.p_phi_equil = " << p_phi_equil << std::endl;
 
     // Numerics
     n_particles = config->get_qualified_as<unsigned int>("Numerics.n_particles").value_or(DEFAULT_N_PARTICLES);
@@ -304,7 +304,7 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize particles
     std::cout << "Initializing particles..." << std::endl;
-    int np_stoich = std::round(p_stoich * n_particles);
+    int np_phi_equil = std::round(p_phi_equil * n_particles);
 
 #pragma omp parallel
     {
@@ -316,7 +316,7 @@ void PartiallyStirredReactor::initialize() {
             pvec[ip].setnSpecies(n_species);
             pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
-            if (ip < np_stoich) {
+            if (ip < np_phi_equil) {
                 pvec[ip].seth(h_equil);
                 pvec[ip].setY(Y_equil.data());
             } else {

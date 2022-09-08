@@ -150,7 +150,7 @@ protected:
     std::string mech_filename;
     bool restart;
     std::string restart_filename;
-    double p_stoich;
+    double p_phi_equil;
     unsigned int n_particles;
     int n_steps;
     int n_substeps;
