@@ -813,6 +813,12 @@ bool PartiallyStirredReactor::runDone() {
             rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
     }
+    double fmeanT = mean(variableIndex("T"), true, true);
+    if (fmeanT < T_EXTINCT) {
+        std::cout << "Reached termination condition: fmean(T) (" <<
+            fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
+        return true;
+    }
     return false;
 }
 

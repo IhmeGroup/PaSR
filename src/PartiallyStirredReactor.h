@@ -58,6 +58,7 @@ const std::string STATS_PREFIX = "stats_";
 const std::string STATS_EXT = ".csv";
 
 const int WRITE_PRECISION = 15;
+const double T_EXTINCT = 500.0;
 
 class PartiallyStirredReactor {
 public:
