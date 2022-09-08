@@ -192,6 +192,7 @@ protected:
     std::vector<double> Y_fuel, Y_ox, Y_mix;
     std::vector<double> xtemp1, xtemp2;
     std::vector<double> xmean_old, xvar_old;
+    unsigned int n_recycled, n_recycled_check;
 
     std::vector<std::string> aux_variable_names, derived_variable_names;
     std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)>> variable_functions;

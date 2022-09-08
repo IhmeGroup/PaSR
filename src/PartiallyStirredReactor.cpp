@@ -22,7 +22,8 @@ namespace fs = std::experimental::filesystem;
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_),
     step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0),
-    n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0)
+    n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0),
+    n_recycled(0), n_recycled_check(0)
 {
     parseInput();
 }
@@ -548,8 +549,12 @@ void PartiallyStirredReactor::check() {
     }
 
     std::cout << std::endl;
+    std::cout << "> n_recycled = " << n_recycled << " last step, " <<
+        n_recycled_check << " since last check" << std::endl;
     std::cout << "> rerror = " << rerror << std::endl;
     std::cout << "--------------------------------------------------" << std::endl;
+
+    n_recycled_check = 0;
 }
 
 std::string PartiallyStirredReactor::variableName(int iv) {
@@ -618,6 +623,7 @@ void PartiallyStirredReactor::calcDt() {
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
+    n_recycled = 0;
 #pragma omp parallel
     {
         int tid = omp_get_thread_num();
@@ -627,6 +633,8 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
             if (pvec[ip].tooOld()) {
                 double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
                 recycleParticle(ip, p_inj, tid);
+                n_recycled++;
+                n_recycled_check++;
             }
         }
     }
