@@ -20,7 +20,7 @@ namespace fs = std::experimental::filesystem;
 #endif
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
-    input_filename(input_filename_),
+    input_filename(input_filename_), run_done(false),
     step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0),
     n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0),
     n_recycled(0), n_recycled_check(0)
@@ -504,7 +504,8 @@ void PartiallyStirredReactor::readRestart() {
 void PartiallyStirredReactor::run() {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Begin time stepping..." << std::endl;
-    while (!runDone()) {
+    run_done = false;
+    while (!run_done) {
         takeStep();
     }
     std::cout << "Done." << std::endl;
@@ -609,9 +610,12 @@ void PartiallyStirredReactor::takeStep() {
     // Calculate convergence metric
     calcConvergence();
 
-    // Write data
-    writeRaw();
-    writeStats();
+    // Determine if run is complete
+    run_done = runDone();
+
+    // Write data (force if run is complete)
+    writeRaw(run_done);
+    writeStats(run_done);
 }
 
 void PartiallyStirredReactor::calcDt() {
@@ -849,8 +853,8 @@ void PartiallyStirredReactor::writeRawHeaders() {
     file.close();
 }
 
-void PartiallyStirredReactor::writeRaw() {
-    if (step % write_raw_interval != 0) return;
+void PartiallyStirredReactor::writeRaw(bool force) {
+    if ((!force) && (step % write_raw_interval != 0)) return;
 
     std::ofstream file;
     file.open(RAW_NAME + RAW_EXT, std::ios_base::app);
@@ -913,8 +917,8 @@ void PartiallyStirredReactor::writeStatsHeaders() {
     file_variance.close();
 }
 
-void PartiallyStirredReactor::writeStats() {
-    if (step % write_stats_interval != 0) return;
+void PartiallyStirredReactor::writeStats(bool force) {
+    if ((!force) && (step % write_stats_interval != 0)) return;
 
     std::ofstream file_min;
     std::ofstream file_max;

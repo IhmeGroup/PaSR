@@ -102,9 +102,9 @@ protected:
     void copyState();
     std::string statsPath(std::string name);
     void writeStatsHeaders();
-    void writeStats();
+    void writeStats(bool force=false);
     void writeRawHeaders();
-    void writeRaw();
+    void writeRaw(bool force=false);
 
     void checkVariable(int iv);
 
@@ -179,6 +179,8 @@ protected:
     std::string tau_res_hist_name;
     Histogram tau_res_hist;
     double tau_mix;
+
+    bool run_done;
 
     std::vector<std::shared_ptr<Cantera::Solution>> solvec;
     std::vector<std::shared_ptr<Cantera::ThermoPhase>> gasvec;
