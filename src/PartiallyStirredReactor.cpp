@@ -23,7 +23,7 @@ PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filena
     input_filename(input_filename_), run_done(false),
     step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0),
     n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0),
-    n_recycled(0), n_recycled_check(0)
+    particles_injected(false), n_recycled(0), n_recycled_check(0)
 {
     parseInput();
 }
@@ -505,6 +505,7 @@ void PartiallyStirredReactor::run() {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Begin time stepping..." << std::endl;
     run_done = false;
+    particles_injected = false;
     while (!run_done) {
         takeStep();
     }
@@ -642,6 +643,7 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
             }
         }
     }
+    particles_injected = particles_injected || (n_recycled > 0);
 }
 
 void PartiallyStirredReactor::subStepMix(double dt) {
@@ -812,7 +814,7 @@ bool PartiallyStirredReactor::runDone() {
         std::cout << "Reached termination condition: t >= t_stop at step " << step << std::endl;
         return true;
     }
-    if (rerror <= rtol && (step >= min_steps_converge)) {
+    if ((rerror <= rtol) && (step >= min_steps_converge) && (particles_injected)) {
         std::cout << "Reached termination condition: rerror (" <<
             rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
