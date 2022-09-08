@@ -83,10 +83,20 @@ void Histogram::readHist(std::string hist_filename) {
             std::stringstream str(line);
 
             std::getline(str, word, ',');
-            bin_edges.push_back(std::stod(word));
+            try {
+                bin_edges.push_back(std::stod(word));
+            } catch (const std::out_of_range& e) {
+                // Value is too small to represent as double
+                bin_edges.push_back(0.0);
+            }
 
             if (std::getline(str, word, ',')) {
-                counts.push_back(std::stod(word));
+                try {
+                    counts.push_back(std::stod(word));
+                } catch (const std::out_of_range& e) {
+                    // Value is too small to represent as double
+                    counts.push_back(0.0);
+                }
                 n_bins++;
             }
         }
