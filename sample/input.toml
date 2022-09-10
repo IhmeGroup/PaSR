@@ -29,9 +29,9 @@ comp_ox = "O2:0.21,N2:0.79"
 T_fuel = 500.0
 T_ox = 1800.0
 phi_global = 1.0
-tau_res_mode = "DISTRIBUTION"
-# tau_res = 1.0e-3
-tau_res = "hist_test.csv"
+tau_res_mode = "EXP_MEAN"
+tau_res = 1.0e-3
+# tau_res = "hist_test.csv"
 tau_mix = 1.0e-4
 
 [Output]

@@ -142,7 +142,9 @@ void PartiallyStirredReactor::parseInput() {
     phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(DEFAULT_PHI_GLOBAL);
     std::cout << "> Conditions.phi_global = " << phi_global << std::endl;
     std::string tau_res_mode_str = config->get_qualified_as<std::string>("Conditions.tau_res_mode").value_or(DEFAULT_TAU_RES_MODE);
-    if (tau_res_mode_str == "CONSTANT") {
+    if (tau_res_mode_str == "EXP_MEAN") {
+        tau_res_mode = EXP_MEAN;
+    } else if (tau_res_mode_str == "CONSTANT") {
         tau_res_mode = CONSTANT;
     } else if (tau_res_mode_str == "DISTRIBUTION") {
         tau_res_mode = DISTRIBUTION;
@@ -150,14 +152,19 @@ void PartiallyStirredReactor::parseInput() {
         std::cerr <<
           "Invalid tau_res mode: " +
           tau_res_mode_str +
-          ". Must be CONSTANT or DISTRIBUTION." << std::endl;
+          ". Must be EXP_MEAN, CONSTANT, or DISTRIBUTION." << std::endl;
         throw(0);
     }
     std::cout << "> Conditions.tau_res_Mode = " << tauResModeString(tau_res_mode) << std::endl;
     switch(tau_res_mode) {
+        case EXP_MEAN: {
+            tau_res_value = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_VALUE);
+            std::cout << "> Conditions.tau_res = " << tau_res_value << std::endl;
+            break;
+        }
         case CONSTANT: {
-            tau_res_constant = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_CONSTANT);
-            std::cout << "> Conditions.tau_res = " << tau_res_constant << std::endl;
+            tau_res_value = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_VALUE);
+            std::cout << "> Conditions.tau_res = " << tau_res_value << std::endl;
             break;
         }
         case DISTRIBUTION: {
@@ -218,8 +225,12 @@ void PartiallyStirredReactor::initialize() {
     // Set step sizes
     if (dt_step <= 0.0) {
         switch (tau_res_mode) {
+            case EXP_MEAN: {
+                dt_step = 0.1 * std::min(tau_res_value, tau_mix);
+                break;
+            }
             case CONSTANT: {
-                dt_step = 0.1 * std::min(tau_res_constant, tau_mix);
+                dt_step = 0.1 * std::min(tau_res_value, tau_mix);
                 break;
             }
             case DISTRIBUTION: {
@@ -320,17 +331,23 @@ void PartiallyStirredReactor::initialize() {
                 pvec[ip].seth(h_equil);
                 pvec[ip].setY(Y_equil.data());
             } else {
-                double Z = dists_uni_real[tid](rand_engines[tid]);
+                double Z = (double)(ip - np_phi_equil) / (double)(n_particles - np_phi_equil);
                 gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
+                gasvec[tid]->setState_HP(h_mix, P);
                 gasvec[tid]->equilibrate("HP");
                 pvec[ip].seth(gasvec[tid]->enthalpy_mass());
                 pvec[ip].setY(gasvec[tid]->massFractions());
             }
 
             switch (tau_res_mode) {
+                case EXP_MEAN: {
+                    pvec[ip].setAge(0.0);
+                    pvec[ip].setTauRes(0.0); // TODO - figure out how to compute this in this mode
+                    break;
+                }
                 case CONSTANT: {
-                    pvec[ip].setAge(dists_uni_real[tid](rand_engines[tid]) * tau_res_constant);
-                    pvec[ip].setTauRes(tau_res_constant);
+                    pvec[ip].setAge(dists_uni_real[tid](rand_engines[tid]) * tau_res_value);
+                    pvec[ip].setTauRes(tau_res_value);
                     break;
                 }
                 case DISTRIBUTION: {
@@ -629,17 +646,39 @@ void PartiallyStirredReactor::calcDt() {
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
     n_recycled = 0;
+    if (tau_res_mode == EXP_MEAN) {
+        // Random choice formulation
+        p_out += n_particles * dt / tau_res_value; // Fractional particle count to recycle
+        int np_out = std::round(p_out); // Round to integer
+        p_out -= np_out; // Hold on to remainder for next step
 #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
+        {
+            int tid = omp_get_thread_num();
 #pragma omp for
-        // Iterate over particles and recycle
-        for (int ip = 0; ip < n_particles; ip++) {
-            if (pvec[ip].tooOld()) {
+            // Iterate over particles and recycle
+            for (int ip_out = 0; ip_out < np_out; ip_out++) {
+                unsigned int ip = dists_uni_int[tid](rand_engines[tid]); // Index of particle to recycle
                 double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
                 recycleParticle(ip, p_inj, tid);
                 n_recycled++;
                 n_recycled_check++;
+            }
+        }
+        particles_injected = particles_injected || (n_recycled > 0);
+    } else {
+        // Life expectancy formulation
+#pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+#pragma omp for
+            // Iterate over particles and recycle
+            for (int ip = 0; ip < n_particles; ip++) {
+                if (pvec[ip].tooOld()) {
+                    double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
+                    recycleParticle(ip, p_inj, tid);
+                    n_recycled++;
+                    n_recycled_check++;
+                }
             }
         }
     }
@@ -708,7 +747,8 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             break;
         }
         case IEM: {
-            meanState(&xtemp1, false, true);
+            // meanState(&xtemp1, false, true);
+            meanState(&xtemp1, false, false); // DEBUG
             Particle pmean;
             pmean.setnSpecies(n_species);
             pmean.setState(xtemp1.data());
@@ -757,8 +797,12 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
     }
     pvec[ip].setAge(0.0);
     switch (tau_res_mode) {
+        case EXP_MEAN: {
+            pvec[ip].setTauRes(0.0);
+            break;
+        }
         case CONSTANT: {
-            pvec[ip].setTauRes(tau_res_constant);
+            pvec[ip].setTauRes(tau_res_value);
             break;
         }
         case DISTRIBUTION: {
@@ -819,10 +863,10 @@ bool PartiallyStirredReactor::runDone() {
             rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
     }
-    double fmeanT = mean(variableIndex("T"), true, true);
-    if (fmeanT < T_EXTINCT) {
-        std::cout << "Reached termination condition: fmean(T) (" <<
-            fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
+    double maxT = max(variableIndex("T"), true);
+    if (maxT < T_EXTINCT) {
+        std::cout << "Reached termination condition: max(T) (" <<
+            maxT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
         return true;
     }
     return false;

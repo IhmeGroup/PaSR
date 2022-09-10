@@ -21,18 +21,34 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-data_file = "./sample/particle_data.csv"
+data_file = "./particle_data.csv"
 
 data = pd.read_csv(data_file)
 
 data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
 
-plot_data = data.iloc[-10000:]
+plot_data = data.iloc[-100:]
 
 plt.figure()
-plt.scatter(plot_data['Z'], plot_data['C'], s=0.1)
+plt.scatter(plot_data['Z'], plot_data['C'], s=20)
+plt.xlabel("$Z$")
+plt.ylabel("$C$")
+plt.tight_layout()
+plt.savefig("PaSR_Z_C.png", bbox_inches='tight', dpi=300)
+
+plt.figure()
+plt.scatter(plot_data['Z'], plot_data['T'], s=20)
+plt.xlabel("$Z$")
+plt.ylabel("$T$ (K)")
+plt.tight_layout()
+plt.savefig("PaSR_Z_T.png", bbox_inches='tight', dpi=300)
 
 plt.figure()
 plt.hist(plot_data['tau_res'])
+plt.tight_layout()
+plt.savefig("PaSR_tau_res.png", bbox_inches='tight', dpi=300)
 
-plt.show()
+plt.figure()
+plt.hist(plot_data['T'])
+plt.tight_layout()
+plt.savefig("PaSR_T.png", bbox_inches='tight', dpi=300)

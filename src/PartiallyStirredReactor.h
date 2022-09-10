@@ -37,8 +37,8 @@ const double DEFAULT_T_FUEL = 300.0;
 const double DEFAULT_T_OX = 300.0;
 const double DEFAULT_T_INIT = 300.0;
 const double DEFAULT_PHI_GLOBAL = 1.0;
-const std::string DEFAULT_TAU_RES_MODE = "CONSTANT";
-const double DEFAULT_TAU_RES_CONSTANT = 1.0;
+const std::string DEFAULT_TAU_RES_MODE = "EXP_MEAN";
+const double DEFAULT_TAU_RES_VALUE = 1.0;
 const std::string DEFAULT_TAU_RES_HIST_NAME = "";
 const double DEFAULT_TAU_MIX = 1.0;
 const unsigned int DEFAULT_CHECK_INTERVAL = 1;
@@ -49,7 +49,7 @@ const int DEFAULT_WRITE_INTERVAL = -1;
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum InjectionMode {PREMIXED, NONPREMIXED};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
-enum TauResMode {CONSTANT, DISTRIBUTION};
+enum TauResMode {EXP_MEAN, CONSTANT, DISTRIBUTION};
 
 const std::string RAW_NAME = "particle_data";
 const std::string RAW_EXT = ".csv";
@@ -142,6 +142,7 @@ protected:
 
     std::string tauResModeString(TauResMode tau_res_mode_) {
         switch (tau_res_mode_) {
+            case EXP_MEAN: return "EXP_MEAN";
             case CONSTANT: return "CONSTANT";
             case DISTRIBUTION: return "DISTRIBUTION";
         }
@@ -175,7 +176,7 @@ protected:
     double h_fuel, h_ox, h_mix;
     double phi_global;
     TauResMode tau_res_mode;
-    double tau_res_constant;
+    double tau_res_value;
     std::string tau_res_hist_name;
     Histogram tau_res_hist;
     double tau_mix;
