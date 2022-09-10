@@ -629,14 +629,15 @@ void PartiallyStirredReactor::calcDt() {
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
-    n_recycled = 0;
+    int n_recycled_ = 0;
+    int n_recycled_check_ = n_recycled_check;
     switch (tau_res_mode) {
         case EXP_MEAN: {
             // Random choice formulation
             p_out += n_particles * dt / tau_res_value; // Fractional particle count to recycle
             int np_out = std::round(p_out); // Round to integer
             p_out -= np_out; // Hold on to remainder for next step
-#pragma omp parallel reduction(+:n_recycled,n_recycled_check)
+#pragma omp parallel reduction(+:n_recycled_,n_recycled_check_)
             {
                 int tid = omp_get_thread_num();
 #pragma omp for
@@ -645,15 +646,15 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
                     unsigned int ip = dists_uni_int[tid](rand_engines[tid]); // Index of particle to recycle
                     double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
                     recycleParticle(ip, p_inj, tid);
-                    n_recycled++;
-                    n_recycled_check++;
+                    n_recycled_++;
+                    n_recycled_check_++;
                 }
             }
             break;
         }
         case DISTRIBUTION: {
             // Life expectancy formulation
-#pragma omp parallel reduction(+:n_recycled,n_recycled_check)
+#pragma omp parallel reduction(+:n_recycled_,n_recycled_check_)
             {
                 int tid = omp_get_thread_num();
 #pragma omp for
@@ -662,14 +663,16 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
                     if (pvec[ip].tooOld()) {
                         double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
                         recycleParticle(ip, p_inj, tid);
-                        n_recycled++;
-                        n_recycled_check++;
+                        n_recycled_++;
+                        n_recycled_check_++;
                     }
                 }
             }
             break;
         }
     }
+    n_recycled = n_recycled_;
+    n_recycled_check = n_recycled_check_;
     particles_injected = particles_injected || (n_recycled > 0);
 }
 
