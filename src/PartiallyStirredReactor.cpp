@@ -847,10 +847,10 @@ bool PartiallyStirredReactor::runDone() {
             rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
     }
-    double maxT = max(variableIndex("T"), true);
-    if (maxT < T_EXTINCT) {
-        std::cout << "Reached termination condition: max(T) (" <<
-            maxT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
+    double fmeanT = mean(variableIndex("T"), true, true);
+    if (fmeanT < T_EXTINCT) {
+        std::cout << "Reached termination condition: fmean(T) (" <<
+            fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
         return true;
     }
     return false;
