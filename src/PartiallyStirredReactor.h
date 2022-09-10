@@ -49,7 +49,7 @@ const int DEFAULT_WRITE_INTERVAL = -1;
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
 enum InjectionMode {PREMIXED, NONPREMIXED};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
-enum TauResMode {EXP_MEAN, CONSTANT, DISTRIBUTION};
+enum TauResMode {EXP_MEAN, DISTRIBUTION};
 
 const std::string RAW_NAME = "particle_data";
 const std::string RAW_EXT = ".csv";
@@ -143,7 +143,6 @@ protected:
     std::string tauResModeString(TauResMode tau_res_mode_) {
         switch (tau_res_mode_) {
             case EXP_MEAN: return "EXP_MEAN";
-            case CONSTANT: return "CONSTANT";
             case DISTRIBUTION: return "DISTRIBUTION";
         }
     }
