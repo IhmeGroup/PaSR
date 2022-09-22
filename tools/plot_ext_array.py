@@ -28,10 +28,12 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-sim_dir_pattern = "sim_*"
+sim_dir_pattern = "./*/sim_*"
 data_file = "particle_data.csv"
 stats_dir = "stats"
-scale = 1.0e3
+scale = 1.0
+N_levels = 50
+T_extinct = 800.0
 
 def parseValue(filename, key):
     if not key in filename:
@@ -66,16 +68,31 @@ for i, sim in enumerate(sim_dirs):
 #     T_fmean[i] = np.mean(stats_fmean['T'][-10:])
 
 fig, ax = plt.subplots()
-im = ax.tricontourf(mu*scale, skew, T_fmean)
-# ax.tricontour(mu*scale, skew, T_fmean, levels=[0], colors=['k'], linestyles='dashed', linewidths=2)
+im = ax.tricontourf(mu*scale, var, T_fmean, N_levels)
+ax.tricontour(mu*scale, var, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
+ax.scatter(mu*scale, var, c='k', s=10, marker='X')
+ax.set_xscale('log')
+ax.set_yscale('log')
+ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
+# ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
+ax.set_ylabel(r"$\widetilde{Var\left[\tau_{res}\right]}$")
+ax.set_title(r"Extinction Map")
+
+plt.tight_layout()
+plt.savefig("T_fmean_array_var.png", bbox_inches='tight', dpi=300)
+
+fig, ax = plt.subplots()
+im = ax.tricontourf(mu*scale, skew, T_fmean, N_levels)
+ax.tricontour(mu*scale, skew, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
 plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
 ax.scatter(mu*scale, skew, c='k', s=10, marker='X')
 ax.set_xscale('log')
-ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (ms)")
+# ax.set_yscale('log')
+ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
 # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
 ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
 ax.set_title(r"Extinction Map")
 
 plt.tight_layout()
-plt.savefig("T_fmean_array.png", bbox_inches='tight', dpi=300)
-
+plt.savefig("T_fmean_array_skew.png", bbox_inches='tight', dpi=300)

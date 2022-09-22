@@ -26,8 +26,8 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-mu_arr = 10**(np.linspace(-4, -1, 20))
-sk_arr = np.linspace(0.1, 1.1, 10)
+mu_arr = 10**(np.linspace(-4, -2, 10))
+sk_arr = np.linspace(0.01, 0.8, 10)
 
 data = pd.DataFrame()
 
@@ -44,7 +44,7 @@ for mu in mu_arr:
         # print("Kurt: {0:.4e}".format(kurt))
 
         age = np.linspace(1.0e-5,
-                        5 * mu, 1000)
+                          5 * mu, 1000)
         pdf = stats.gamma.pdf(age, alpha, 0, scale)
 
         # pdf[pdf < 1.0e-300] = 0.0 # smallest double for c++
