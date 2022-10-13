@@ -28,7 +28,8 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-sim_dir_pattern = "./*/sim_*"
+parent_dir_pattern = "./Da_*"
+sim_dir_pattern = "./sim_*"
 data_file = "particle_data.csv"
 stats_dir = "stats"
 scale = 1.0
@@ -44,55 +45,69 @@ def parseValue(filename, key):
         end_index = len(filename)
     return float(filename[start_index:end_index])
 
-sim_dirs = glob.glob(sim_dir_pattern)
-n_cases = len(sim_dirs)
+parent_dirs = glob.glob(parent_dir_pattern)
+n_parents = len(parent_dirs)
 
-mu = np.zeros(n_cases)
-var = np.zeros(n_cases)
-skew = np.zeros(n_cases)
-T_fmean = np.zeros(n_cases)
+Da_arr = np.zeros(n_parents)
 
-for i, sim in enumerate(sim_dirs):
-    print("Reading case " + sim + "...")
+for ip, parent_dir in enumerate(parent_dirs):
 
-    mu[i] = parseValue(sim, "mu")
-    var[i] = parseValue(sim, "var")
-    skew[i] = parseValue(sim, "skew")
+    os.chdir(parent_dir)
 
-#     data = pd.read_csv(os.path.join(sim, data_file))
-#     data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
-#     plot_data = data.iloc[-10000:]
+    Da_arr[ip] = parseValue(parent_dir, "Da")
 
-    stats_fmean = pd.read_csv(os.path.join(sim, stats_dir, "stats_fmean.csv"))
-    T_fmean[i] = stats_fmean['T'][-1:]
-#     T_fmean[i] = np.mean(stats_fmean['T'][-10:])
+    sim_dirs = glob.glob(sim_dir_pattern)
+    n_cases = len(sim_dirs)
 
-fig, ax = plt.subplots()
-im = ax.tricontourf(mu*scale, var, T_fmean, N_levels)
-ax.tricontour(mu*scale, var, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
-plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
-ax.scatter(mu*scale, var, c='k', s=10, marker='X')
-ax.set_xscale('log')
-ax.set_yscale('log')
-ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
-# ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
-ax.set_ylabel(r"$\widetilde{Var\left[\tau_{res}\right]}$")
-ax.set_title(r"Extinction Map")
+    mu = np.zeros(n_cases)
+    var = np.zeros(n_cases)
+    skew = np.zeros(n_cases)
+    T_fmean = np.zeros(n_cases)
 
-plt.tight_layout()
-plt.savefig("T_fmean_array_var.png", bbox_inches='tight', dpi=300)
+    for i, sim in enumerate(sim_dirs):
+        print("Reading case " + sim + "...")
 
-fig, ax = plt.subplots()
-im = ax.tricontourf(mu*scale, skew, T_fmean, N_levels)
-ax.tricontour(mu*scale, skew, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
-plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
-ax.scatter(mu*scale, skew, c='k', s=10, marker='X')
-ax.set_xscale('log')
-# ax.set_yscale('log')
-ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
-# ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
-ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
-ax.set_title(r"Extinction Map")
+        mu[i] = parseValue(sim, "mu")
+        var[i] = parseValue(sim, "var")
+        skew[i] = parseValue(sim, "skew")
 
-plt.tight_layout()
-plt.savefig("T_fmean_array_skew.png", bbox_inches='tight', dpi=300)
+    #     data = pd.read_csv(os.path.join(sim, data_file))
+    #     data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
+    #     plot_data = data.iloc[-10000:]
+
+        stats_fmean = pd.read_csv(os.path.join(sim, stats_dir, "stats_fmean.csv"))
+        T_fmean[i] = stats_fmean['T'][-1:]
+    #     T_fmean[i] = np.mean(stats_fmean['T'][-10:])
+
+
+    os.chdir("../")
+
+    fig, ax = plt.subplots()
+    im = ax.tricontourf(mu*scale, var, T_fmean, N_levels)
+    ax.tricontour(mu*scale, var, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+    plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
+    ax.scatter(mu*scale, var, c='k', s=10, marker='X')
+    ax.set_xscale('log')
+    ax.set_yscale('log')
+    ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
+    # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
+    ax.set_ylabel(r"$\widetilde{Var\left[\tau_{res}\right]}$")
+    ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+
+    plt.tight_layout()
+    plt.savefig("T_fmean_array_var_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
+
+    fig, ax = plt.subplots()
+    im = ax.tricontourf(mu*scale, skew, T_fmean, N_levels)
+    ax.tricontour(mu*scale, skew, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+    plt.colorbar(im, label=r"$\widetilde{T}$ (K)")
+    ax.scatter(mu*scale, skew, c='k', s=10, marker='X')
+    ax.set_xscale('log')
+    # ax.set_yscale('log')
+    ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
+    # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
+    ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
+    ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+
+    plt.tight_layout()
+    plt.savefig("T_fmean_array_skew_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)

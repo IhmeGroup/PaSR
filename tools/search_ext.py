@@ -6,10 +6,10 @@ import toml
 
 ref_file_name = "./input.toml"
 job_file_name = "./job.slurm"
-hist_dir = "./hists"
+mu_arr = 10**(np.linspace(-4, -2, 10))
+sk_arr = np.linspace(0.01, 0.8, 10)
 # Da_arr = np.array([10])
-# Da_arr = 10**np.linspace(0, 1, 5)
-Da_arr = np.linspace(5, 10, 3)
+Da_arr = 10**np.linspace(0, 1, 5)
 sim_dir_prefix = "sim_"
 overwrite = True
 write_only = False
@@ -24,7 +24,6 @@ def parseValue(filename, key):
     return float(filename[start_index:end_index])
 
 input_file = toml.load(ref_file_name)
-hist_files = np.array(os.listdir(hist_dir))
 
 for Da in Da_arr:
     print("Writing cases for Da = {0:.4e}...".format(Da))
