@@ -11,19 +11,6 @@ const int c_offset_age = 0;
 const int c_offset_tau_res = 1;
 const int c_offset_mass = 2;
 
-#pragma omp declare \
-    reduction( \
-        vec_particle_plus : \
-        std::vector<Particle> : \
-        std::transform( \
-            omp_out.begin(), \
-            omp_out.end(), \
-            omp_in.begin(), \
-            omp_out.begin(), \
-            std::plus<Particle>())) \
-    initializer( \
-        omp_priv = decltype(omp_orig)(omp_orig.size()))
-
 class Particle {
 public:
     explicit Particle();

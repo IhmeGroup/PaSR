@@ -60,6 +60,19 @@ const std::string STATS_EXT = ".csv";
 const int WRITE_PRECISION = 15;
 const double T_EXTINCT = 500.0;
 
+#pragma omp declare \
+    reduction( \
+        vec_particle_plus : \
+        std::vector<Particle> : \
+        std::transform( \
+            omp_out.begin(), \
+            omp_out.end(), \
+            omp_in.begin(), \
+            omp_out.begin(), \
+            std::plus<Particle>())) \
+    initializer( \
+        omp_priv = decltype(omp_orig)(omp_orig.size()))
+
 class PartiallyStirredReactor {
 public:
     explicit PartiallyStirredReactor(const std::string& input_filename_);
@@ -67,7 +80,7 @@ public:
     void initialize();
     void run();
     void print();
-    void check();
+    void check(bool force=false);
 
     std::string variableName(int iv);
     int variableIndex(std::string name);

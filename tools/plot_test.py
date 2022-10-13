@@ -25,16 +25,16 @@ data_file = "./particle_data.csv"
 
 data = pd.read_csv(data_file)
 
-data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
+# data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
 
-plot_data = data.iloc[-100:]
+plot_data = data.iloc[-1000:]
 
-plt.figure()
-plt.scatter(plot_data['Z'], plot_data['C'], s=20)
-plt.xlabel("$Z$")
-plt.ylabel("$C$")
-plt.tight_layout()
-plt.savefig("PaSR_Z_C.png", bbox_inches='tight', dpi=300)
+# plt.figure()
+# plt.scatter(plot_data['Z'], plot_data['C'], s=20)
+# plt.xlabel("$Z$")
+# plt.ylabel("$C$")
+# plt.tight_layout()
+# plt.savefig("PaSR_Z_C.png", bbox_inches='tight', dpi=300)
 
 plt.figure()
 plt.scatter(plot_data['Z'], plot_data['T'], s=20)

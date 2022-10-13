@@ -13,6 +13,7 @@ Particle::Particle(const int& id) {
 void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas) {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Particle " << id << ":" << std::endl;
+    std::cout << "> mass: " << getMass() << std::endl;
     std::cout << "> age: " << getAge() << std::endl;
     if (gas) {
         std::cout << "> T: " << T(gas) << std::endl;
@@ -20,7 +21,7 @@ void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas
     std::cout << "> h: " << h() << std::endl;
     std::cout << "> Y: " << std::endl;
     for (int k = 0; k < n_species; k++) {
-        if (Y(k) >= threshold) {
+        if (std::abs(Y(k)) >= threshold) {
             std::cout << ">   " << k << ": " << Y(k) << std::endl;
         }
     }

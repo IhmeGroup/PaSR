@@ -237,7 +237,7 @@ void PartiallyStirredReactor::initialize() {
 
         // EMST mixing models require a smaller time step
         if ((mixing_model == EMST_1D) || (mixing_model == EMST)) {
-            dt_step /= 0.5;
+            dt_step /= 5;
         }
 
         std::cout << "Setting dt automatically: " << dt_step << std::endl;
@@ -539,9 +539,11 @@ void PartiallyStirredReactor::checkVariable(int iv) {
         std::left << std::setw(COL_WIDTH) << max(iv, true) << std::endl;
 }
 
-void PartiallyStirredReactor::check() {
-    if (check_interval == 0) return;
-    else if ((step % check_interval) != 0) return;
+void PartiallyStirredReactor::check(bool force) {
+    if (!force) {
+        if (check_interval == 0) return;
+        else if ((step % check_interval) != 0) return;
+    }
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Starting step: " << step << ", t = " << t << std::endl;
     std::cout << std::endl;
@@ -637,6 +639,7 @@ void PartiallyStirredReactor::calcDt() {
         dt_step = t_stop - t;
     }
     n_sub = 1 + std::round(dt_step / dt_sub_target);
+    // n_sub = 1; // DEBUG
     dt_sub = dt_step / n_sub;
 }
 
@@ -765,24 +768,25 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             int ip_m, ip_n;
             double Wi, Wv;
             double dt_save = dt;
-            std::vector<double> Bv(n_particles, 0.0);
-
-            // double A, B, C, alpha;
-            // std::vector<double> phi(n_state_variables, 0.0);
-            // std::vector<double> dphi(n_state_variables, 0.0);
-
             double dt_temp = dt;
             double alpha;
+            std::vector<double> w(n_particles, 0.0);
+            std::vector<double> Bv(n_particles, 0.0);
             std::vector<double> A(n_state_variables, 0.0);
             std::vector<double> B(n_state_variables, 0.0);
             std::vector<double> C(n_state_variables, 0.0);
-            // std::vector<double> alpha(n_state_variables, 0.0);
 
-            // Get particle masses
-            std::vector<double> M(n_particles, 0.0);
+            // Get particle weights
+            double M_tot = 0.0;
+#pragma omp parallel for reduction(+:M_tot)
+            for (int ip = 0; ip < n_particles; ip++) {
+                w[ip] = pvec[ip].getMass();
+                M_tot += w[ip];
+            }
+
 #pragma omp parallel for
             for (int ip = 0; ip < n_particles; ip++) {
-                M[ip] = pvec[ip].getMass();
+                w[ip] /= M_tot;
             }
 
             while (dt_save > 0) {
@@ -803,7 +807,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
                 // Compute weights
                 Wi = 0;
                 for (int ip = 0; ip < n_particles; ip++) {
-                    Wi += M[iZ_sorted[ip]];
+                    Wi += w[iZ_sorted[ip]];
                     Wv = std::min(Wi, 1 - Wi);
                     Bv[ip] = 2 * Wv;
                 }
@@ -818,30 +822,30 @@ void PartiallyStirredReactor::subStepMix(double dt) {
                 }
 
                 // Compute mixing dpvec
-#pragma omp parallel for reduction(vec_particle_plus:pvec_temp1)
+// #pragma omp parallel for reduction(vec_particle_plus:pvec_temp1)
                 for (int ip = 0; ip < n_particles - 1; ip++) {
                     ip_m = iZ_sorted[ip];
                     ip_n = iZ_sorted[ip+1];
-                    pvec_temp1[ip_m] += - Bv[ip] * (pvec[ip_m] - pvec[ip_n]) / M[ip_m];
-                    pvec_temp1[ip_n] += - Bv[ip] * (pvec[ip_n] - pvec[ip_m]) / M[ip_n];
+                    pvec_temp1[ip_m] += - Bv[ip] * (pvec[ip_m] - pvec[ip_n]) / w[ip_m];
+                    pvec_temp1[ip_n] += - Bv[ip] * (pvec[ip_n] - pvec[ip_m]) / w[ip_n];
                 }
-                
-                double dt_min = std::numeric_limits<double>::infinity();
-#pragma omp parallel for reduction(min:dt_min)
+
+                // Determine maximum allowable time step
                 for (int iv = 0; iv < n_state_variables; iv++) {
-                    A[iv] = 0.0;
-                    B[iv] = 0.0;
-                    C[iv] = 0.0;
+                    double A_ = 0.0;
+                    double B_ = 0.0;
+                    double C_ = 0.0;
+#pragma omp parallel for reduction(+:A_,B_,C_)
                     for (int ip = 0; ip < n_particles; ip++) {
-                        A[iv] += pvec_temp1[ip].state(iv) * pvec_temp1[ip].state(iv);
-                        B[iv] += pvec_temp1[ip].state(iv) * pvec[ip].state(iv);
-                        C[iv] += (1.0 / tau_mix) * xtemp1[iv];
+                        A_ += pvec_temp1[ip].state(iv) * pvec_temp1[ip].state(iv);
+                        B_ += pvec_temp1[ip].state(iv) * pvec[ip].state(iv);
+                        C_ += (1.0 / tau_mix) * xtemp1[iv];
                     }
-                    A[iv] = A[iv] / n_state_variables;
-                    B[iv] = 2.0 * B[iv] / n_state_variables;
-                    dt_min = std::min(dt_min, (B[iv] * B[iv]) / (4.0 * A[iv] * C[iv]));
+                    A[iv] = A_ / n_particles;
+                    B[iv] = 2.0 * B_ / n_particles;
+                    C[iv] = C_;
+                    dt_temp = std::min(dt_temp, (B[iv] * B[iv]) / (4.0 * A[iv] * C[iv]));
                 }
-                dt_temp = std::min(dt_temp, dt_min);
 
                 alpha = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:alpha)
@@ -851,7 +855,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 
                 dt_temp = std::min(dt_temp, dt_save);
 
-                // Root finding
+                // Root finding - search for optimal mixing ratio
                 for (int ii = 0; ii < 4; ii++) {
 #pragma omp parallel for
                     for (int ip = 0; ip < n_particles; ip++) {
@@ -860,10 +864,21 @@ void PartiallyStirredReactor::subStepMix(double dt) {
                     varianceState(&pvec_temp2, &xtemp2, false);
                     double var_decay = 0.0;
                     for (int iv = 0; iv < n_state_variables; iv++) {
-                        var_decay += (xtemp2[iv] / xtemp1[iv]);
+                        double var_decay_iv = xtemp2[iv] / xtemp1[iv];
+                        // Check NaN, arises when variance is 0
+                        if (var_decay_iv == var_decay_iv) {
+                            var_decay += var_decay_iv;
+                        }
+
+                        // DEBUG
+                        // std::cout << "iv: " << iv <<
+                        //     " xtemp1[iv]: " << xtemp1[iv] <<
+                        //     " xtemp2[iv]: " << xtemp2[iv] <<
+                        //     " var_decay: " << var_decay << std::endl;
+                        // DEBUG
                     }
                     var_decay = 1.0 - (var_decay / n_state_variables);
-                    double var_ratio = var_decay / (1.0 - std::exp(- dt_temp / tau_mix));
+                    double var_ratio = var_decay / (1.0 - std::exp(-dt_temp / tau_mix));
                     alpha /= var_ratio;
                 }
 
@@ -875,9 +890,6 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 
                 dt_save -= dt_temp;
             }
-
-            throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
-                                               "EMST_1D not implemented.");
             break;
         }
         case EMST: {
@@ -1310,7 +1322,7 @@ void PartiallyStirredReactor::varianceState(std::vector<Particle>* pvec_, std::v
 
     // Sum across particles
     std::vector<double> xmeanvec(xvarvec->size(), 0.0);
-    meanState(&pvec_, &xmeanvec, favre);
+    meanState(pvec_, &xmeanvec, favre);
     std::vector<double> xsumvec(xvarvec->size(), 0.0);
 #pragma omp parallel for reduction(vec_double_plus:xsumvec)
     for (int ip = 0; ip < n_particles; ip++) {
