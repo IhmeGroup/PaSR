@@ -11,9 +11,23 @@ const int c_offset_age = 0;
 const int c_offset_tau_res = 1;
 const int c_offset_mass = 2;
 
+#pragma omp declare \
+    reduction( \
+        vec_particle_plus : \
+        std::vector<Particle> : \
+        std::transform( \
+            omp_out.begin(), \
+            omp_out.end(), \
+            omp_in.begin(), \
+            omp_out.begin(), \
+            std::plus<Particle>())) \
+    initializer( \
+        omp_priv = decltype(omp_orig)(omp_orig.size()))
+
 class Particle {
 public:
     explicit Particle();
+    explicit Particle(const int& id);
     ~Particle();
 
     Particle operator+= (const Particle& rhs)& {
@@ -171,8 +185,8 @@ public:
         return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
-    void setIndex(int index_) {
-        index = index_;
+    void setID(int id_) {
+        id = id_;
     }
 
     void setnSpecies(int n_species_) {
@@ -223,7 +237,7 @@ public:
     void react(Cantera::ReactorNet* rnet, double dt);
 
 protected:
-    int index;
+    int id;
     int n_species;
     int n_state_variables;
     double* m_P = nullptr;

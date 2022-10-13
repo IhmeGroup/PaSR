@@ -1,19 +1,19 @@
 #include "Injector.h"
 
 Injector::Injector() :
-    index(0)
+    id(0)
 {
 
 }
 
-Injector::Injector(const int& index, const unsigned int& n_species) {
-    setIndex(index);
+Injector::Injector(const int& id, const unsigned int& n_species) {
+    setID(id);
     setnSpecies(n_species);
 }
 
 void Injector::print(double threshold) {
     std::cout << "--------------------------------------------------" << std::endl;
-    std::cout << "Injector " << index << ":" << std::endl;
+    std::cout << "Injector " << id << ":" << std::endl;
     std::cout << "> flow: " << getFlow() << std::endl;
     std::cout << "> h: " << h() << std::endl;
     std::cout << "> Y: " << std::endl;

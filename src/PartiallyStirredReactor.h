@@ -46,7 +46,7 @@ const std::vector<std::string> DEFAULT_CHECK_VARIABLE_NAMES{};
 const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
 
-enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST};
+enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
 enum InjectionMode {PREMIXED, NONPREMIXED};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
 enum TauResMode {EXP_MEAN, DISTRIBUTION};
@@ -83,8 +83,10 @@ public:
     void minState(std::vector<double>* minvec, bool all=false);
     void maxState(std::vector<double>* maxvec, bool all=false);
     void meanState(std::vector<double>* xsumvec, bool all=false, bool favre=true);
+    void meanState(std::vector<Particle>* pvec_, std::vector<double>* xsumvec, bool favre=true);
     void varianceState(std::vector<double>* xvarvec, bool all=false, bool favre=true);
-    void varianceState(std::vector<double>* xvarvec,std::vector<double>* xmeanvec, bool all=false);
+    void varianceState(std::vector<Particle>* pvec_, std::vector<double>* xvarvec, bool favre=true);
+    void varianceState(std::vector<double>* xvarvec, std::vector<double>* xmeanvec, bool all=false);
     void histState(std::vector<std::vector<double>>* histvec, bool all=false);
 
 protected:
@@ -129,7 +131,9 @@ protected:
             case CURL: return "CURL";
             case MOD_CURL: return "MOD_CURL";
             case IEM: return "IEM";
+            case EMST_1D: return "EMST_1D";
             case EMST: return "EMST";
+            case KER_M: return "KER_M";
         }
     }
 
@@ -189,7 +193,7 @@ protected:
     std::vector<Cantera::IdealGasConstPressureReactor*> reactorvec;
     std::vector<Cantera::ReactorNet*> rnetvec;
 
-    std::vector<Particle> pvec;
+    std::vector<Particle> pvec, pvec_temp1, pvec_temp2;
     std::vector<Injector> injvec;
     unsigned int n_species;
     unsigned int n_state_variables, n_aux_variables, n_derived_variables;

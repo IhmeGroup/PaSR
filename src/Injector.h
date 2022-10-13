@@ -5,7 +5,7 @@
 class Injector {
 public:
     explicit Injector();
-    explicit Injector(const int& index, const unsigned int& n_species_);
+    explicit Injector(const int& id, const unsigned int& n_species_);
     ~Injector();
 
     double& h() {
@@ -24,8 +24,8 @@ public:
         return m_Y[k];
     }
 
-    void setIndex(const int& index_) {
-        index = index_;
+    void setID(const int& id_) {
+        id = id_;
     }
 
     void setnSpecies(const unsigned int& n_species_) {
@@ -64,7 +64,7 @@ public:
     void print(double threshold = 1.0e-14);
 
 protected:
-    int index;
+    int id;
     unsigned int n_species;
     double flow;
     double m_h;
