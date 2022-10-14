@@ -206,7 +206,7 @@ protected:
     std::vector<Cantera::IdealGasConstPressureReactor*> reactorvec;
     std::vector<Cantera::ReactorNet*> rnetvec;
 
-    std::vector<Particle> pvec, pvec_temp1, pvec_temp2;
+    std::vector<Particle> pvec, pvec_temp1, pvec_temp2, pvec_partemp;
     std::vector<Injector> injvec;
     unsigned int n_species;
     unsigned int n_state_variables, n_aux_variables, n_derived_variables;

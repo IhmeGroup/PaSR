@@ -280,6 +280,7 @@ void PartiallyStirredReactor::initialize() {
     pvec.resize(n_particles * n_stat);
     pvec_temp1.resize(n_particles);
     pvec_temp2.resize(n_particles);
+    pvec_partemp.resize(omp_get_max_threads());
     xtemp1.resize(n_state_variables);
     xtemp2.resize(n_state_variables);
     xmean_old.resize(n_state_variables);
@@ -714,17 +715,16 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 #pragma omp parallel
             {
                 int tid = omp_get_thread_num();
-                Particle pc;
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
                     double a = dists_uni_real[tid](rand_engines[tid]);
-                    pc = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
+                    pvec_partemp[tid] = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
                         (pvec[ip1].getMass() + pvec[ip2].getMass());
-                    pvec[ip1] = pc;
-                    pvec[ip2] = pc;
+                    pvec[ip1] = pvec_partemp[tid];
+                    pvec[ip2] = pvec_partemp[tid];
                 }
             }
             break;
@@ -734,22 +734,28 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             p_mix += n_particles * dt / tau_mix;
             int np_mix = std::round(p_mix);
             p_mix -= np_mix;
+            // std::cout << "HERE1" << std::endl;
+            // std::cout << "size: " << pvec_partemp.size() << std::endl;
+            // std::cout << "num_threads: " << omp_get_max_threads() << std::endl;
+            // for (int it = 0; it < omp_get_max_threads(); it++) {
+            //     pvec_partemp[it].setnSpecies(n_species);
+            // }
 #pragma omp parallel
             {
                 int tid = omp_get_thread_num();
-                Particle pc;
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
                     double a = dists_uni_real[tid](rand_engines[tid]);
-                    pc = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
+                    pvec_partemp[tid] = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip1]) /
                         (pvec[ip1].getMass() + pvec[ip2].getMass());
-                    pvec[ip1] += a * (pc - pvec[ip1]);
-                    pvec[ip2] += a * (pc - pvec[ip2]);
+                    pvec[ip1] += a * (pvec_partemp[tid] - pvec[ip1]);
+                    pvec[ip2] += a * (pvec_partemp[tid] - pvec[ip2]);
                 }
             }
+            // std::cout << "HERE2" << std::endl;
             break;
         }
         case IEM: {
