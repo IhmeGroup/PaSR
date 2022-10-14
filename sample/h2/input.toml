@@ -1,0 +1,43 @@
+[Mechanism]
+name = "./h2_ucsd_sk9.yaml"
+
+[Initialization]
+restart = false
+name = "restart.csv"
+p_phi_equil = 0.6
+
+[Numerics]
+n_particles = 200
+# n_steps = 10
+t_stop = 4.0e-3
+# dt = 1.0e-6
+# dt_sub = 1.0e-7
+convergence_metric = "MEAN"
+stats_window = 1
+rtol = 1.0e-4
+min_steps_converge = 100
+
+[Models]
+mixing_model = "IEM"
+# mixing_model = "EMST_1D"
+
+[Conditions]
+injection_mode = "NONPREMIXED"
+pilot_flow = 0.0
+pressure = 101325.0
+comp_fuel = "H2:1.0,N2:1.0"
+comp_ox = "O2:0.21,N2:0.79"
+T_fuel = 300.0
+T_ox = 300.0
+phi_global = 1.0
+tau_res_mode = "EXP_MEAN"
+tau_res = 2.0e-3
+# tau_res = "hist_test.csv"
+tau_mix = 0.7e-3
+
+[Output]
+check_interval = 1
+check_variable_names = ["h", "Y_H2", "Y_O2", "Y_N2", "Y_OH", "Y_H2O", "age", "tau_res", "T", "Z"]
+check_verbose = true
+write_raw_interval = 10
+write_stats_interval = 10
