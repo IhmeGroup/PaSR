@@ -1,12 +1,19 @@
 #include "Particle.h"
 
-Particle::Particle() {
+Particle::Particle() :
+    id(0)
+{
+    setnSpecies(0);
+}
 
+Particle::Particle(const int& id, const unsigned int& n_species) {
+    setID(id);
+    setnSpecies(n_species);
 }
 
 void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas) {
     std::cout << "--------------------------------------------------" << std::endl;
-    std::cout << "Particle " << index << ":" << std::endl;
+    std::cout << "Particle " << id << ":" << std::endl;
     std::cout << "> age: " << getAge() << std::endl;
     if (gas) {
         std::cout << "> T: " << T(gas) << std::endl;

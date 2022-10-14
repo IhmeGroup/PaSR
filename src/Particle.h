@@ -14,6 +14,7 @@ const int c_offset_mass = 2;
 class Particle {
 public:
     explicit Particle();
+    explicit Particle(const int& id, const unsigned int& n_species_);
     ~Particle();
 
     Particle operator+= (const Particle& rhs)& {
@@ -171,8 +172,8 @@ public:
         return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
-    void setIndex(int index_) {
-        index = index_;
+    void setID(int id_) {
+        id = id_;
     }
 
     void setnSpecies(int n_species_) {
@@ -223,7 +224,7 @@ public:
     void react(Cantera::ReactorNet* rnet, double dt);
 
 protected:
-    int index;
+    int id;
     int n_species;
     int n_state_variables;
     double* m_P = nullptr;

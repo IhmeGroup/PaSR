@@ -312,7 +312,7 @@ void PartiallyStirredReactor::initialize() {
 #pragma omp for
         for (int ip = 0; ip < n_particles; ip++) {
             pvec[ip].setP(&P);
-            pvec[ip].setIndex(ip);
+            pvec[ip].setID(ip);
             pvec[ip].setnSpecies(n_species);
             pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
