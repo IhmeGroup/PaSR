@@ -3,11 +3,12 @@
 Particle::Particle() :
     id(0)
 {
-
+    setnSpecies(0);
 }
 
-Particle::Particle(const int& id) {
+Particle::Particle(const int& id, const unsigned int& n_species) {
     setID(id);
+    setnSpecies(n_species);
 }
 
 void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas) {

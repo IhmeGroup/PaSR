@@ -3,7 +3,7 @@
 Injector::Injector() :
     id(0)
 {
-
+    setnSpecies(0);
 }
 
 Injector::Injector(const int& id, const unsigned int& n_species) {

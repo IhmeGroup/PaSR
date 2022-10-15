@@ -14,7 +14,7 @@ const int c_offset_mass = 2;
 class Particle {
 public:
     explicit Particle();
-    explicit Particle(const int& id);
+    explicit Particle(const int& id, const unsigned int& n_species_);
     ~Particle();
 
     Particle operator+= (const Particle& rhs)& {

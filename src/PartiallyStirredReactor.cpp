@@ -249,7 +249,7 @@ void PartiallyStirredReactor::initialize() {
 
     // Create distributions and random engines for each thread
     for (int it = 0; it < omp_get_max_threads(); it++) {
-        std::uniform_int_distribution<unsigned int> uni_int(0, n_particles);
+        std::uniform_int_distribution<unsigned int> uni_int(0, n_particles-1);
         std::uniform_real_distribution<double> uni_real(0, 1);
         std::mt19937 eng((it + 1) * static_cast<uint64_t>(
             std::chrono::system_clock::to_time_t(std::chrono::system_clock::now())));
@@ -653,15 +653,38 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
             p_out += n_particles * dt / tau_res_value; // Fractional particle count to recycle
             int np_out = std::round(p_out); // Round to integer
             p_out -= np_out; // Hold on to remainder for next step
+
+            std::vector<int> ip_vec(np_out, -1);
+            bool repeat;
+            for (int i = 0; i < np_out; i++) {
+
+                // Generate random particle index to recycle
+                unsigned int ip = dists_uni_int[0](rand_engines[0]);
+
+                // Check if repeated
+                repeat = false;
+                for (int j = 0; j < i; j++) {
+                    if (ip_vec[j] == ip) {
+                        repeat = true;
+                        break;
+                    }
+                }
+
+                if (repeat) {
+                    i--; // If repeated, try again
+                } else {
+                    ip_vec[i] = ip; // Otherwise, set
+                }
+            }
+
 #pragma omp parallel reduction(+:n_recycled_,n_recycled_check_)
             {
                 int tid = omp_get_thread_num();
 #pragma omp for
                 // Iterate over particles and recycle
                 for (int ip_out = 0; ip_out < np_out; ip_out++) {
-                    unsigned int ip = dists_uni_int[tid](rand_engines[tid]); // Index of particle to recycle
                     double p_inj = dists_uni_real[tid](rand_engines[tid]); // Probability: which injector to use for new particle
-                    recycleParticle(ip, p_inj, tid);
+                    recycleParticle(ip_vec[ip_out], p_inj, tid);
                     n_recycled_++;
                     n_recycled_check_++;
                 }
