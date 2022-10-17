@@ -210,6 +210,7 @@ protected:
     std::vector<Injector> injvec;
     unsigned int n_species;
     unsigned int n_state_variables, n_aux_variables, n_derived_variables;
+    unsigned int id_iterator;
     std::vector<unsigned int> i_fuel;
     std::vector<double> Y_fuel, Y_ox, Y_mix;
     std::vector<double> xtemp1, xtemp2;

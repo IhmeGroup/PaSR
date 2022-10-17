@@ -21,7 +21,7 @@ namespace fs = std::experimental::filesystem;
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_), run_done(false),
-    step(0), t(0.0), p_out(0.0), i_stat(1), n_particles(0),
+    step(0), t(0.0), p_out(0.0), i_stat(1), id_iterator(0), n_particles(0),
     n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0),
     particles_injected(false), n_recycled(0), n_recycled_check(0)
 {
@@ -325,7 +325,7 @@ void PartiallyStirredReactor::initialize() {
 #pragma omp for
         for (int ip = 0; ip < n_particles; ip++) {
             pvec[ip].setP(&P);
-            pvec[ip].setID(ip);
+            pvec[ip].setID(id_iterator++);
             pvec[ip].setnSpecies(n_species);
             pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
@@ -423,6 +423,12 @@ void PartiallyStirredReactor::initialize() {
     }
 
     // Initialize auxiliary variables
+    aux_variable_names.push_back("id");
+    variable_functions.push_back(
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getID(); });
+    n_aux_variables++;
+
     aux_variable_names.push_back("age");
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
@@ -741,6 +747,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
+                    // TODO: particle weights are not used
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
                     double a = dists_uni_real[tid](rand_engines[tid]);
@@ -757,18 +764,13 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             p_mix += n_particles * dt / tau_mix;
             int np_mix = std::round(p_mix);
             p_mix -= np_mix;
-            // std::cout << "HERE1" << std::endl;
-            // std::cout << "size: " << pvec_partemp.size() << std::endl;
-            // std::cout << "num_threads: " << omp_get_max_threads() << std::endl;
-            // for (int it = 0; it < omp_get_max_threads(); it++) {
-            //     pvec_partemp[it].setnSpecies(n_species);
-            // }
 #pragma omp parallel
             {
                 int tid = omp_get_thread_num();
 #pragma omp for
                 // Iterate over pairs and mix
                 for (int ipair = 0; ipair < np_mix; ipair++) {
+                    // TODO: Particle weights are not used
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
                     double a = dists_uni_real[tid](rand_engines[tid]);
@@ -778,7 +780,6 @@ void PartiallyStirredReactor::subStepMix(double dt) {
                     pvec[ip2] += a * (pvec_partemp[tid] - pvec[ip2]);
                 }
             }
-            // std::cout << "HERE2" << std::endl;
             break;
         }
         case IEM: {
@@ -963,6 +964,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
             break;
         }
     }
+    pvec[ip].setID(id_iterator++);
     pvec[ip].setAge(0.0);
     switch (tau_res_mode) {
         case EXP_MEAN: {

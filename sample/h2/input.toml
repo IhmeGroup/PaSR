@@ -18,8 +18,8 @@ rtol = 1.0e-4
 min_steps_converge = 100
 
 [Models]
-mixing_model = "IEM"
-# mixing_model = "EMST_1D"
+# mixing_model = "MOD_CURL"
+mixing_model = "EMST_1D"
 
 [Conditions]
 injection_mode = "NONPREMIXED"

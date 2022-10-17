@@ -100,6 +100,10 @@ public:
         throw Cantera::CanteraError("Particle::stateAux", "Invalid index");
     }
 
+    int& getID() {
+        return id;
+    }
+
     double& getAge() {
         return age;
     }
