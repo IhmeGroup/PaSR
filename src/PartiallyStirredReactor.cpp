@@ -221,7 +221,7 @@ void PartiallyStirredReactor::initialize() {
 
     // Set step sizes
     if (dt_step <= 0.0) {
-        switch (tau_res_mode) {
+        switch(tau_res_mode) {
             case EXP_MEAN: {
                 dt_step = 0.1 * std::min(tau_res_value, tau_mix);
                 break;
@@ -342,7 +342,7 @@ void PartiallyStirredReactor::initialize() {
                 pvec[ip].setY(gasvec[tid]->massFractions());
             }
 
-            switch (tau_res_mode) {
+            switch(tau_res_mode) {
                 case EXP_MEAN: {
                     pvec[ip].setAge(0.0);
                     pvec[ip].setTauRes(0.0); // TODO - figure out how to compute this in this mode
@@ -380,7 +380,7 @@ void PartiallyStirredReactor::initialize() {
     injvec[0].setY(Y_equil.data());
     injvec[0].setFlow(pilot_flow);
 
-    switch (injection_mode) {
+    switch(injection_mode) {
         case PREMIXED: {
             injvec.push_back(Injector(1, n_species));
 
@@ -424,57 +424,45 @@ void PartiallyStirredReactor::initialize() {
     }
 
     // Initialize auxiliary variables
-    aux_variable_names.push_back("id");
-    variable_functions.push_back(
+    addAuxVariable(
+        "id",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getID(); });
-    n_aux_variables++;
-
-    aux_variable_names.push_back("inj_id");
-    variable_functions.push_back(
+    addAuxVariable(
+        "inj_id",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getInjID(); });
-    n_aux_variables++;
-
-    aux_variable_names.push_back("age");
-    variable_functions.push_back(
+    addAuxVariable(
+        "age",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getAge(); });
-    n_aux_variables++;
-
-    aux_variable_names.push_back("tau_res");
-    variable_functions.push_back(
+    addAuxVariable(
+        "tau_res",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getTauRes(); });
-    n_aux_variables++;
-
-    aux_variable_names.push_back("mass");
-    variable_functions.push_back(
+    addAuxVariable(
+        "mass",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getMass(); });
-    n_aux_variables++;
 
     // Initialize derived variables
-    derived_variable_names.push_back("T");
-    variable_functions.push_back(
+    addDerivedVariable(
+        "T",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].T(gas); });
-    n_derived_variables++;
-
-    derived_variable_names.push_back("Z");
-    variable_functions.push_back(
+    addDerivedVariable(
+        "Z",
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].Z(gas, comp_fuel, comp_ox); });
-    n_derived_variables++;
 
     // Set check variables
     if (check_variable_names.size() > 0) {
         for (auto& name : check_variable_names) {
-            iv_check.push_back(variableIndex(name));
+            addCheckVariable(variableIndex(name));
         }
     } else {
         for (int iv = 0; iv < nVariables(); iv++) {
-            iv_check.push_back(iv);
+            addCheckVariable(iv);
         }
     }
 
@@ -660,7 +648,7 @@ void PartiallyStirredReactor::calcDt() {
 void PartiallyStirredReactor::subStepInflow(double dt) {
     int n_recycled_ = 0;
     int n_recycled_check_ = n_recycled_check;
-    switch (tau_res_mode) {
+    switch(tau_res_mode) {
         case EXP_MEAN: {
             // Random choice formulation
             p_out += n_particles * dt / tau_res_value; // Fractional particle count to recycle
@@ -974,7 +962,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
     pvec[ip].setID(id_iterator++);
     pvec[ip].setInjID(iinj);
     pvec[ip].setAge(0.0);
-    switch (tau_res_mode) {
+    switch(tau_res_mode) {
         case EXP_MEAN: {
             pvec[ip].setTauRes(0.0);
             break;
@@ -990,7 +978,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
 }
 
 void PartiallyStirredReactor::calcConvergence() {
-    switch (convergence_metric) {
+    switch(convergence_metric) {
         case MEAN: {
             meanState(&xtemp1, true, true);
             rerror = 0.0;
@@ -1179,6 +1167,47 @@ void PartiallyStirredReactor::writeStats(bool force) {
     file_max.close();
     file_fmean.close();
     file_variance.close();
+}
+
+void PartiallyStirredReactor::addVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter,
+        VariableType type) {
+    switch(type) {
+        case STATE: {
+            throw Cantera::CanteraError("PartiallyStirredReactor::addVariable",
+                                        "STATE type variables cannot be added manually.");
+            break;
+        }
+        case AUX: {
+            addAuxVariable(name, getter);
+            break;
+        }
+        case DERIVED: {
+            addDerivedVariable(name, getter);
+            break;
+        }
+    }
+}
+
+void PartiallyStirredReactor::addAuxVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter) {
+    aux_variable_names.push_back(name);
+    variable_functions.push_back(getter);
+    n_aux_variables++;
+}
+
+void PartiallyStirredReactor::addDerivedVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter) {
+    derived_variable_names.push_back(name);
+    variable_functions.push_back(getter);
+    n_derived_variables++;
+}
+
+void PartiallyStirredReactor::addCheckVariable(int iv) {
+    iv_check.push_back(iv);
 }
 
 double PartiallyStirredReactor::min(int iv, bool all) {

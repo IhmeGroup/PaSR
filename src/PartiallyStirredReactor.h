@@ -50,6 +50,7 @@ enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
 enum InjectionMode {PREMIXED, NONPREMIXED};
 enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
 enum TauResMode {EXP_MEAN, DISTRIBUTION};
+enum VariableType {STATE, AUX, DERIVED};
 
 const std::string RAW_NAME = "particle_data";
 const std::string RAW_EXT = ".csv";
@@ -121,6 +122,17 @@ protected:
     void writeRawHeaders();
     void writeRaw(bool force=false);
 
+    void addVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter,
+        VariableType type);
+    void addAuxVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter);
+    void addDerivedVariable(
+        std::string name,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter);
+    void addCheckVariable(int iv);
     void checkVariable(int iv);
 
     double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
