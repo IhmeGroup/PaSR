@@ -14,6 +14,7 @@ Particle::Particle(const int& id, const unsigned int& n_species) {
 void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas) {
     std::cout << "--------------------------------------------------" << std::endl;
     std::cout << "Particle " << id << ":" << std::endl;
+    std::cout << "> injector: " << getInjID() << std::endl;
     std::cout << "> mass: " << getMass() << std::endl;
     std::cout << "> age: " << getAge() << std::endl;
     if (gas) {

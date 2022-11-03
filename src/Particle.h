@@ -104,6 +104,10 @@ public:
         return id;
     }
 
+    int& getInjID() {
+        return inj_id;
+    }
+
     double& getAge() {
         return age;
     }
@@ -180,6 +184,10 @@ public:
         id = id_;
     }
 
+    void setInjID(int inj_id_) {
+        inj_id = inj_id_;
+    }
+
     void setnSpecies(int n_species_) {
         n_species = n_species_;
         n_state_variables = n_species + c_offset_Y;
@@ -229,6 +237,7 @@ public:
 
 protected:
     int id;
+    int inj_id;
     int n_species;
     int n_state_variables;
     double* m_P = nullptr;

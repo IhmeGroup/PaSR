@@ -326,6 +326,7 @@ void PartiallyStirredReactor::initialize() {
         for (int ip = 0; ip < n_particles; ip++) {
             pvec[ip].setP(&P);
             pvec[ip].setID(id_iterator++);
+            pvec[ip].setInjID(-1);
             pvec[ip].setnSpecies(n_species);
             pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
@@ -427,6 +428,12 @@ void PartiallyStirredReactor::initialize() {
     variable_functions.push_back(
         [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
             return pvec[ip].getID(); });
+    n_aux_variables++;
+
+    aux_variable_names.push_back("inj_id");
+    variable_functions.push_back(
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getInjID(); });
     n_aux_variables++;
 
     aux_variable_names.push_back("age");
@@ -965,6 +972,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
         }
     }
     pvec[ip].setID(id_iterator++);
+    pvec[ip].setInjID(iinj);
     pvec[ip].setAge(0.0);
     switch (tau_res_mode) {
         case EXP_MEAN: {
