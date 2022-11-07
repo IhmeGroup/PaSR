@@ -357,11 +357,49 @@ void PartiallyStirredReactor::initialize() {
         }
     }
 
+    // Initialize variable functions
+    for (int iv = 0; iv < n_state_variables; iv++) {
+        variable_functions.push_back(
+            [this, iv](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+                return pvec[ip].state(iv); });
+    }
+
+    // Initialize auxiliary variables
+    addAuxVariable(
+        "id",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getID(); });
+    addAuxVariable(
+        "inj_id",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getInjID(); });
+    addAuxVariable(
+        "age",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getAge(); });
+    addAuxVariable(
+        "tau_res",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getTauRes(); });
+    addAuxVariable(
+        "mass",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].getMass(); });
+
+    // Initialize derived variables
+    addDerivedVariable(
+        "T",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].T(gas); });
+    addDerivedVariable(
+        "Z",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            return pvec[ip].Z(gas, comp_fuel, comp_ox); });
+
     // Read restart
     if (restart) {
         std::cout << "Reading restart..." << std::endl;
         readRestart();
-        
         std::cout << "Done reading restart." << std::endl;
     }
 
@@ -416,45 +454,6 @@ void PartiallyStirredReactor::initialize() {
         inj.print();
     }
 
-    // Initialize variable functions
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        variable_functions.push_back(
-            [this, iv](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-                return pvec[ip].state(iv); });
-    }
-
-    // Initialize auxiliary variables
-    addAuxVariable(
-        "id",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].getID(); });
-    addAuxVariable(
-        "inj_id",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].getInjID(); });
-    addAuxVariable(
-        "age",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].getAge(); });
-    addAuxVariable(
-        "tau_res",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].getTauRes(); });
-    addAuxVariable(
-        "mass",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].getMass(); });
-
-    // Initialize derived variables
-    addDerivedVariable(
-        "T",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].T(gas); });
-    addDerivedVariable(
-        "Z",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
-            return pvec[ip].Z(gas, comp_fuel, comp_ox); });
-
     // Set check variables
     if (check_variable_names.size() > 0) {
         for (auto& name : check_variable_names) {
@@ -478,31 +477,49 @@ void PartiallyStirredReactor::initialize() {
 void PartiallyStirredReactor::readRestart() {
     std::string line, word;
     std::ifstream file(restart_filename);
+    std::vector<std::string> names_read;
     std::vector<int> iv_read;
     if (file.is_open()) {
 
-        std::stringstream str(line);
-
         // Read header
         std::getline(file, line);
+        std::stringstream str(line);
         while (std::getline(str, word, ',')) {
+            names_read.push_back(word);
             iv_read.push_back(variableIndex(word));
         }
 
         // Read content
         for (int ip = 0; ip < n_particles; ip++) {
             if (std::getline(file, line)) {
+                std::stringstream str(line);
                 for (int iiv = 0; iiv < iv_read.size(); iiv++) {
                     if (iv_read[iiv] >= n_state_variables + n_aux_variables) continue;
                     std::getline(str, word, ',');
-                    pvec[ip].stateAux(iv_read[iiv]) = std::stod(word);
+                    if (iv_read[iiv] >= n_state_variables + n_aux_variables) {
+                        continue;
+                    } else if (iv_read[iiv] >= n_state_variables) {
+                        if (names_read[iiv] == "id") {
+                            pvec[ip].setID(std::stoi(word));
+                        } else if (names_read[iiv] == "inj_id") {
+                            pvec[ip].setInjID(std::stoi(word));
+                        } else if (names_read[iiv] == "age") {
+                            pvec[ip].setAge(std::stod(word));
+                        } else if (names_read[iiv] == "tau_res") {
+                            pvec[ip].setTauRes(std::stod(word));
+                        } else if (names_read[iiv] == "mass") {
+                            pvec[ip].setMass(std::stod(word));
+                        }
+                    } else {
+                        pvec[ip].state(iv_read[iiv]) = std::stod(word);
+                    }
                 }
             } else {
                 std::cout << "WARNING: Only " << ip+1 << " particle(s) specified in restart file. Repeating read." << std::endl;
                 file.clear(); // Reset eof and fail flags
                 file.seekg(0); // Go to beginning of file
-                std::getline(file, line); // Advance by 1 line
-                ip--; // Decrement ip so this particle is not skipp
+                std::getline(file, line); // Advance by 1 line to skip header
+                ip--; // Decrement ip so this particle is set next iteration
             }
         }
 
@@ -584,8 +601,10 @@ std::string PartiallyStirredReactor::variableName(int iv) {
         return prefix + gasvec[0]->speciesName(iv-c_offset_Y);
     } else if (iv < n_state_variables + n_aux_variables) {
         return aux_variable_names[iv - n_state_variables];
-    } else {
+    } else if (iv < nVariables()) {
         return derived_variable_names[iv - n_state_variables - n_aux_variables];
+    } else {
+        throw std::runtime_error("PartiallyStirredReactor::variableName - invalid index.");
     }
 }
 
