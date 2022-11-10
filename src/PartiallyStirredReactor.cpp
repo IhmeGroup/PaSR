@@ -479,6 +479,7 @@ void PartiallyStirredReactor::readRestart() {
     std::ifstream file(restart_filename);
     std::vector<std::string> names_read;
     std::vector<int> iv_read;
+    bool too_short_warned = false;
     if (file.is_open()) {
 
         // Read header
@@ -515,7 +516,10 @@ void PartiallyStirredReactor::readRestart() {
                     }
                 }
             } else {
-                std::cout << "WARNING: Only " << ip+1 << " particle(s) specified in restart file. Repeating read." << std::endl;
+                if (!too_short_warned) {
+                    std::cout << "WARNING: Only " << ip+1 << " particle(s) specified in restart file. Repeating read." << std::endl;
+                    too_short_warned = true;
+                }
                 file.clear(); // Reset eof and fail flags
                 file.seekg(0); // Go to beginning of file
                 std::getline(file, line); // Advance by 1 line to skip header
@@ -526,7 +530,7 @@ void PartiallyStirredReactor::readRestart() {
         // Warn about extra particles
         if (std::getline(file, line)) {
             std::cout << "WARNING: More particles than necessary specified in restart file. " << 
-                "Only reading first " << n_particles << "particle(s)." << std::endl;
+                "Only reading first " << n_particles << " particle(s)." << std::endl;
         }
     } else {
         throw std::runtime_error("PartiallyStirredReactor::readRestart - could not open " + restart_filename + ".");
