@@ -146,6 +146,7 @@ protected:
             case MEAN: return "MEAN";
             case MEAN_VAR: return "MEAN_VAR";
             case HIST: return "HIST";
+            default: throw std::runtime_error("Invalid ID: " + convergence_metric_);
         }
     }
 
@@ -159,6 +160,7 @@ protected:
             case EMST_1D: return "EMST_1D";
             case EMST: return "EMST";
             case KER_M: return "KER_M";
+            default: throw std::runtime_error("Invalid ID: " + mixing_model_);
         }
     }
 
@@ -166,6 +168,7 @@ protected:
         switch (injection_mode_) {
             case PREMIXED: return "PREMIXED";
             case NONPREMIXED: return "NONPREMIXED";
+            default: throw std::runtime_error("Invalid ID: " + injection_mode_);
         }
     }
 
@@ -173,6 +176,7 @@ protected:
         switch (tau_res_mode_) {
             case EXP_MEAN: return "EXP_MEAN";
             case DISTRIBUTION: return "DISTRIBUTION";
+            default: throw std::runtime_error("Invalid ID: " + tau_res_mode_);
         }
     }
 
