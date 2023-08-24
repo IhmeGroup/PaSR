@@ -335,8 +335,9 @@ void PartiallyStirredReactor::initialize() {
                 pvec[ip].setY(Y_equil.data());
             } else {
                 double Z = (double)(ip - np_phi_equil) / (double)(n_particles - np_phi_equil);
+                double h = h_fuel * Z + h_ox * (1 - Z);
                 gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
-                gasvec[tid]->setState_HP(h_mix, P);
+                gasvec[tid]->setState_HP(h, P);
                 gasvec[tid]->equilibrate("HP");
                 pvec[ip].seth(gasvec[tid]->enthalpy_mass());
                 pvec[ip].setY(gasvec[tid]->massFractions());
