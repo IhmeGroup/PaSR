@@ -41,6 +41,9 @@ figsize = [5, 4]
 levels = np.linspace(T_bounds[0], T_bounds[1], N_levels)
 levels_label = np.arange(T_bounds[0], T_bounds[1]+100, 100)
 
+levels_01 = np.linspace(0, 1, 101)
+levels_01_label = np.linspace(0, 1, 5)
+
 def parseValue(filename, key):
     if not key in filename:
         raise ValueError("Key " + key + " not found in filename")
@@ -67,7 +70,10 @@ for ip, parent_dir in enumerate(parent_dirs):
     mu = np.zeros(n_cases)
     var = np.zeros(n_cases)
     skew = np.zeros(n_cases)
-    T_fmean = np.zeros(n_cases)
+    # T_fmean = np.zeros(n_cases)
+    T_fmean = [[] for i in range(n_cases)]
+    T_fmean_mean = np.zeros(n_cases)
+    p_lit = np.zeros(n_cases)
 
     for i, sim in enumerate(sim_dirs):
         print("Reading case " + sim + "...")
@@ -76,20 +82,25 @@ for ip, parent_dir in enumerate(parent_dirs):
         var[i] = parseValue(sim, "var")
         skew[i] = parseValue(sim, "skew")
 
-    #     data = pd.read_csv(os.path.join(sim, data_file))
-    #     data['C'] = data['Y_CO'] + data['Y_CO2'] + data['Y_H2'] + data['Y_H2O']
-    #     plot_data = data.iloc[-10000:]
-
-        stats_fmean = pd.read_csv(os.path.join(sim, stats_dir, "stats_fmean.csv"))
-        T_fmean[i] = stats_fmean['T'][-1:]
-    #     T_fmean[i] = np.mean(stats_fmean['T'][-10:])
-
+        cases = os.listdir(sim)
+        for case in cases:
+            stats_fmean = pd.read_csv(os.path.join(sim, case, stats_dir, "stats_fmean.csv"))
+            if len(stats_fmean) == 0:
+                continue
+            T_fmean[i].append(stats_fmean['T'].iloc[-1])
+        
+        T_arr = np.array(T_fmean[i])
+        p_lit[i] = np.sum(T_arr >= T_extinct) / len(T_arr)
+        T_fmean_mean[i] = np.mean(T_fmean[i])
+    
+    p_lit[p_lit > 0.99] = 0.99
+    p_lit[p_lit < 0.01] = 0.01
 
     os.chdir("../")
 
     fig, ax = plt.subplots(figsize=figsize)
-    im = ax.tricontourf(mu*scale, var, T_fmean, levels, extend='both')
-    ax.tricontour(mu*scale, var, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+    im = ax.tricontourf(mu*scale, var, T_fmean_mean, levels, extend='both')
+    ax.tricontour(mu*scale, var, T_fmean_mean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
     cbar = plt.colorbar(im, label=r"$\widetilde{T}$ (K)", ticks=levels_label)
     cbar.ax.set_yticklabels(levels_label)
     ax.scatter(mu*scale, var, c='k', s=10, marker='X')
@@ -98,14 +109,15 @@ for ip, parent_dir in enumerate(parent_dirs):
     ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
     # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
     ax.set_ylabel(r"$\widetilde{Var\left[\tau_{res}\right]}$")
-    ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+    # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
 
     plt.tight_layout()
     plt.savefig("T_fmean_array_var_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
 
     fig, ax = plt.subplots(figsize=figsize)
-    im = ax.tricontourf(mu*scale, skew, T_fmean, levels, extend='both')
-    ax.tricontour(mu*scale, skew, T_fmean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+    im = ax.tricontourf(mu*scale, skew, T_fmean_mean, levels, extend='both')
+    ax.tricontour(mu*scale, skew, T_fmean_mean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
     cbar = plt.colorbar(im, label=r"$\widetilde{T}$ (K)", ticks=levels_label)
     cbar.ax.set_yticklabels(levels_label)
     ax.scatter(mu*scale, skew, c='k', s=10, marker='X')
@@ -114,7 +126,25 @@ for ip, parent_dir in enumerate(parent_dirs):
     ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
     # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
     ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
-    ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+    # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
 
     plt.tight_layout()
     plt.savefig("T_fmean_array_skew_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
+
+    fig, ax = plt.subplots(figsize=figsize)
+    im = ax.tricontourf(mu*scale, skew, p_lit, levels_01)
+    # ax.tricontour(mu*scale, skew, T_fmean_mean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
+    cbar = plt.colorbar(im, label=r"$P(ig)$", ticks=levels_01_label)
+    cbar.ax.set_yticklabels(levels_01_label)
+    ax.scatter(mu*scale, skew, c='k', s=10, marker='X')
+    ax.set_xscale('log')
+    # ax.set_yscale('log')
+    ax.set_xlabel(r"$\widetilde{\tau_{res}}$ (s)")
+    # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
+    ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
+    # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+
+    plt.tight_layout()
+    plt.savefig("P_ig_array_skew_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)

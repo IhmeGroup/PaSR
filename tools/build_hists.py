@@ -27,17 +27,18 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-mu_arr = 10**(np.linspace(-4, -2, 10))
-sk_arr = np.linspace(0.1, 3.0, 10)
+mu_arr = 10**(np.linspace(-4.5, -2, 20))
+sk_arr = np.linspace(0.01, 10.0, 20)
 
 # mu_arr = [1.8e-3]
 # # var = 1.0e-7
 # var_arr = 10**np.linspace(-5, -9, 5)
 # var_arr = np.linspace(10**-8, 10**-6, 10)
 # sk = 10.0
-# sk_arr = np.linspace(0.1, 3.0, 5)
+# sk_arr = np.linspace(0.1, 10.0, 5)
 
 data = pd.DataFrame()
+# fig, ax = plt.subplots(figsize=[4, 3.2])
 
 for mu in mu_arr:
     for sk in sk_arr:
@@ -91,9 +92,12 @@ for mu in mu_arr:
         data['hist'] = hist
         data.to_csv("hists/hist_mu_{0:.4e}_var_{1:.4e}_skew_{2:.4e}.csv".format(mean, var, skew), header=False, index=False)
 
-    #     plt.plot(age, pdf / np.amax(pdf), linewidth=2, label=r"$\sigma^2 = {0:.2e}$".format(var))
-    # plt.xlabel(r"$\tau_{res}$")
-    # plt.ylabel(r"$PDF(\tau_{res})$")
+    #     # ax.plot(age * 1.0e3, pdf, linewidth=2, label=r"$\sigma^2 = {0:.2e}$".format(var))
+    #     ax.plot(age * 1.0e3, pdf / np.amax(pdf), linewidth=2, label=r"$\sigma^2 = {0:.2e}$".format(var))
+    # ax.set_xlabel(r"$\tau_{res}$ [ms]")
+    # # ax.set_ylabel(r"$\mathcal{P}(\tau_{res})$")
+    # ax.set_ylabel(r"$\mathcal{P}(\tau_{res}) / \hat{\mathcal{P}}(\tau_{res})$")
     # plt.legend()
-    # plt.savefig("test.png")
+    # plt.tight_layout()
+    # plt.savefig("hists.png", bbox_inches='tight', dpi=300)
     # plt.show()
