@@ -7,10 +7,8 @@ import toml
 ref_file_name = "./input.toml"
 job_file_name = "./job.slurm"
 hist_dir = "./hists"
-Da_arr = np.array([10])
-# Da_arr = 10**np.linspace(0, 1, 5)
-# Da_arr = np.linspace(5, 10, 3)
-N_samples = 5
+Pe_arr = np.array([0.125, 0.25, 0.5])
+N_samples = 1
 sim_dir_prefix = "sim_"
 overwrite = True
 write_only = False
@@ -27,16 +25,16 @@ def parseValue(filename, key):
 input_file = toml.load(ref_file_name)
 hist_files = np.array(os.listdir(hist_dir))
 
-for Da in Da_arr:
-    print("Writing cases for Da = {0:.4e}...".format(Da))
+for Pe in Pe_arr:
+    print("Writing cases for Pe = {0:.4e}...".format(Pe))
 
-    Da_dir_name = "Da_{0:.4e}".format(Da)
+    Pe_dir_name = "Pe_{0:.4e}".format(Pe)
 
-    if overwrite and os.path.exists(Da_dir_name):
-        shutil.rmtree(Da_dir_name)
-    os.makedirs(Da_dir_name)
+    if overwrite and os.path.exists(Pe_dir_name):
+        shutil.rmtree(Pe_dir_name)
+    os.makedirs(Pe_dir_name)
 
-    os.chdir(Da_dir_name)
+    os.chdir(Pe_dir_name)
 
     for i, hist_file in enumerate(hist_files):
         id = os.path.splitext(hist_file)[0][5:]
@@ -63,7 +61,7 @@ for Da in Da_arr:
             input_file = toml.load(ref_file_name)
             input_file['Conditions']['tau_res'] = r'{}'.format(
                 os.path.join("../../../", hist_dir, hist_file))
-            input_file['Conditions']['tau_mix'] = float(mu / Da)
+            input_file['Conditions']['tau_mix'] = float(mu * Pe)
             input_file['Numerics']['t_stop'] = 10.0 * mu
 
             with open(ref_file_name, "w") as file:

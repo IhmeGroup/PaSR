@@ -34,8 +34,8 @@ data_file = "particle_data.csv"
 stats_dir = "stats"
 scale = 1.0
 N_levels = 55
-T_extinct = 800.0
-T_bounds = [600, 1200]
+T_extinct = 1200.0
+T_bounds = [800, 1500]
 figsize = [5, 4]
 
 levels = np.linspace(T_bounds[0], T_bounds[1], N_levels)

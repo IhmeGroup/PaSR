@@ -27,8 +27,8 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-mu_arr = 10**(np.linspace(-4.5, -2, 20))
-sk_arr = np.linspace(0.01, 10.0, 20)
+mu_arr = 10**(np.linspace(-4, -2, 20))
+sk_arr = np.linspace(0.01, 3.0, 20)
 
 # mu_arr = [1.8e-3]
 # # var = 1.0e-7
