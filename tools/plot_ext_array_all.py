@@ -28,7 +28,7 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-parent_dir_pattern = "./Da_*"
+parent_dir_pattern = "./Pe_*"
 sim_dir_pattern = "./sim_*"
 data_file = "particle_data.csv"
 stats_dir = "stats"
@@ -56,12 +56,11 @@ def parseValue(filename, key):
 parent_dirs = np.array(glob.glob(parent_dir_pattern))
 n_parents = len(parent_dirs)
 
-Da_arr = np.array([parseValue(parent_dir, "Da") for parent_dir in parent_dirs])
-Pe_arr = 1.0 / Da_arr
+Pe_arr = np.array([parseValue(parent_dir, "Pe") for parent_dir in parent_dirs])
 
 i_sorted = np.argsort(Pe_arr)
 
-Da_arr = Da_arr[i_sorted]
+# Da_arr = Da_arr[i_sorted]
 Pe_arr = Pe_arr[i_sorted]
 parent_dirs = parent_dirs[i_sorted]
 
@@ -75,8 +74,6 @@ fig_p, axs_p = plt.subplots(1, n_parents + 1,
 for ip, parent_dir in enumerate(parent_dirs):
 
     os.chdir(parent_dir)
-
-    Da_arr[ip] = parseValue(parent_dir, "Da")
 
     sim_dirs = glob.glob(sim_dir_pattern)
     n_cases = len(sim_dirs)
@@ -126,7 +123,7 @@ for ip, parent_dir in enumerate(parent_dirs):
     axs_T[ip].tricontour(mu*scale, skew, T_fmean_mean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
     axs_T[ip].scatter(mu*scale, skew, c='k', s=10, marker='X')
     axs_T[ip].set_xscale('log')
-    axs_T[ip].set_title(r"$Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+    axs_T[ip].set_title(r"$Pe = {0:.2f}$".format(Pe_arr[ip]))
     axs_T[ip].set_xlabel(r"$\overline{\tau}_{res}$ [s]")
     if ip == 0:
         axs_T[ip].set_ylabel(r"$\widetilde{\mu}_3$")
@@ -139,7 +136,7 @@ for ip, parent_dir in enumerate(parent_dirs):
     im = axs_p[ip].tricontourf(mu*scale, skew, p_lit, levels_01)
     axs_p[ip].scatter(mu*scale, skew, c='k', s=10, marker='X')
     axs_p[ip].set_xscale('log')
-    axs_p[ip].set_title(r"$Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+    axs_p[ip].set_title(r"$Pe = {0:.2f}$".format(Pe_arr[ip]))
     axs_p[ip].set_xlabel(r"$\overline{\tau}_{res}$ [s]")
     if ip == 0:
         axs_p[ip].set_ylabel(r"$\widetilde{\mu}_3$")
