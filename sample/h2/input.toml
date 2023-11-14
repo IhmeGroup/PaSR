@@ -24,6 +24,7 @@ mixing_model = "EMST_1D"
 [Conditions]
 injection_mode = "NONPREMIXED"
 pilot_flow = 0.0
+# pilot_t_stop = 2.0e-3
 pressure = 101325.0
 comp_fuel = "H2:1.0,N2:1.0"
 comp_ox = "O2:0.21,N2:0.79"

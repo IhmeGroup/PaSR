@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iomanip>
+#include <filesystem>
 #include <cmath>
 #include <limits>
 #include <algorithm>
@@ -10,14 +11,6 @@
 
 #include "common.h"
 #include "PartiallyStirredReactor.h"
-
-#ifdef __APPLE__
-#include <filesystem>
-namespace fs = std::__fs::filesystem;
-#else
-#include <experimental/filesystem>
-namespace fs = std::experimental::filesystem;
-#endif
 
 PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filename_) :
     input_filename(input_filename_), run_done(false),
@@ -133,6 +126,8 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "> Conditions.injection_mode = " << injectionModeString(injection_mode) << std::endl;
     pilot_flow = config->get_qualified_as<double>("Conditions.pilot_flow").value_or(DEFAULT_PILOT_FLOW);
     std::cout << "> Conditions.pilot_flow = " << pilot_flow << std::endl;
+    pilot_t_stop = config->get_qualified_as<double>("Conditions.pilot_t_stop").value_or(DEFAULT_PILOT_T_STOP);
+    std::cout << "> Conditions.pilot_t_stop = " << pilot_t_stop << std::endl;
     P = config->get_qualified_as<double>("Conditions.pressure").value_or(DEFAULT_PRESSURE);
     std::cout << "> Conditions.pressure = " << P << std::endl;
     comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or(DEFAULT_COMP_FUEL);
@@ -655,6 +650,11 @@ void PartiallyStirredReactor::takeStep() {
     // Determine if run is complete
     run_done = runDone();
 
+    // Turn off pilot if pilot_t_stop reached
+    if ((pilot_t_stop > 0.0) && (t >= pilot_t_stop)) {
+        injvec[0].setFlow(0.0);
+    }
+
     // Write data (force if run is complete)
     writeRaw(run_done);
     writeStats(run_done);
@@ -1108,7 +1108,7 @@ std::string PartiallyStirredReactor::statsPath(std::string name) {
 }
 
 void PartiallyStirredReactor::writeStatsHeaders() {
-    fs::create_directories(STATS_DIR);
+    std::filesystem::create_directories(STATS_DIR);
 
     std::ofstream file_min;
     std::ofstream file_max;

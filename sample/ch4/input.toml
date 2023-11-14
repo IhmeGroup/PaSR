@@ -23,6 +23,7 @@ mixing_model = "IEM"
 [Conditions]
 injection_mode = "NONPREMIXED"
 pilot_flow = 0.05
+# pilot_t_stop = 5.0e-3
 pressure = 101325.0
 comp_fuel = "CH4:1.0"
 comp_ox = "O2:0.21,N2:0.79"
