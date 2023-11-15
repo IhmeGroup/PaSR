@@ -1081,7 +1081,7 @@ void PartiallyStirredReactor::writeStatsHeaders() {
 }
 
 void PartiallyStirredReactor::writeStats(bool force) {
-    if ((!force) && (step % write_stats_interval != 0)) return;
+    if ((!force) && ((write_stats_interval < 0) || (step % write_stats_interval != 0))) return;
 
     std::ofstream file_min;
     std::ofstream file_max;
