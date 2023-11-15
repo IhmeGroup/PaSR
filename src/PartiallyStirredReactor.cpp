@@ -7,8 +7,6 @@
 #include <chrono>
 #include <omp.h>
 
-#include "../cpptoml/include/cpptoml.h"
-
 #include "common.h"
 #include "PartiallyStirredReactor.h"
 
@@ -21,6 +19,36 @@ PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filena
     parseInput();
 }
 
+template <typename T>
+T PartiallyStirredReactor::parseValue(std::shared_ptr<cpptoml::table> config, std::string name, T default_value) {
+    T value = config->get_qualified_as<T>(name).value_or(default_value);
+    std::cout << "> " << name << " = " << value << std::endl;
+    return value;
+}
+
+template <typename T>
+T PartiallyStirredReactor::parseEnumValue(
+    std::shared_ptr<cpptoml::table> config,
+    std::string name,
+    std::unordered_map<std::string, T> enum_map,
+    std::string default_value_str) {
+    std::string value_str = parseValue<std::string>(config, name, default_value_str);
+    return enum_map.at(value_str);
+}
+
+template <typename T>
+std::vector<T> PartiallyStirredReactor::parseArray(std::shared_ptr<cpptoml::table> config, std::string name, std::vector<T> default_value) {
+    std::vector<T> value = config->get_qualified_array_of<T>(name).value_or(default_value);
+    if (value.size() > 0) {
+        std::cout << "> " << name << " = ";
+        for (auto& v : value) {
+            std::cout << v << ", ";
+        }
+        std::cout << std::endl;
+    }
+    return value;
+}
+
 void PartiallyStirredReactor::parseInput() {
     auto config = cpptoml::parse_file(input_filename);
 
@@ -28,174 +56,63 @@ void PartiallyStirredReactor::parseInput() {
     std::cout << "Input file parameters:" << std::endl;
 
     // Mechanism
-    mech_filename = config->get_qualified_as<std::string>("Mechanism.name").value_or(DEFAULT_MECH_NAME);
-    std::cout << "> Mechanism.name = " << mech_filename << std::endl;
+    mech_filename = parseValue<std::string>(config, "Mechanism.name", DEFAULT_MECH_NAME);
 
     // Initialization
-    restart = config->get_qualified_as<bool>("Initialization.restart").value_or(DEFAULT_RESTART);
-    std::cout << "> Initialization.restart = " << restart << std::endl;
+    restart = parseValue<bool>(config, "Initialization.restart", DEFAULT_RESTART);
     if (restart) {
-        restart_filename = config->get_qualified_as<std::string>("Initialization.name").value_or(DEFAULT_RESTART_NAME);
-        std::cout << "> Initialization.name = " << restart_filename << std::endl;
+        restart_filename = parseValue<std::string>(config, "Initialization.name", DEFAULT_RESTART_NAME);
     }
-    p_phi_equil = config->get_qualified_as<double>("Initialization.p_phi_equil").value_or(DEFAULT_P_STOICH);
-    std::cout << "> Initialization.p_phi_equil = " << p_phi_equil << std::endl;
+    p_phi_equil = parseValue<double>(config, "Initialization.p_phi_equil", DEFAULT_P_STOICH);
 
     // Numerics
-    n_particles = config->get_qualified_as<unsigned int>("Numerics.n_particles").value_or(DEFAULT_N_PARTICLES);
-    std::cout << "> Numerics.n_particles = " << n_particles << std::endl;
-    n_steps = config->get_qualified_as<unsigned int>("Numerics.n_steps").value_or(DEFAULT_N_STEPS);
-    if (n_steps > 0)
-        std::cout << "> Numerics.n_steps = " << n_steps << std::endl;
-    t_stop = config->get_qualified_as<double>("Numerics.t_stop").value_or(DEFAULT_T_STOP);
-    if (t_stop > 0.0)
-        std::cout << "> Numerics.t_stop = " << t_stop << std::endl;
-    dt_step = config->get_qualified_as<double>("Numerics.dt").value_or(DEFAULT_DT);
-    if (dt_step > 0.0)
-        std::cout << "> Numerics.dt = " << dt_step << std::endl;
-    dt_sub_target = config->get_qualified_as<double>("Numerics.dt_sub").value_or(DEFAULT_DT_SUB);
-    if (dt_sub_target > 0.0)
-        std::cout << "> Numerics.dt_sub = " << dt_sub_target << std::endl;
-    std::string convergence_metric_str =
-        config->get_qualified_as<std::string>("Numerics.convergence_metric").value_or(DEFAULT_CONVERGENCE_METRIC);
-    if (convergence_metric_str == "MEAN") {
-        convergence_metric = MEAN;
-    } else if (convergence_metric_str == "MEAN_VAR") {
-        convergence_metric = MEAN_VAR;
-    } else if (convergence_metric_str == "HIST") {
-        convergence_metric = HIST;
-    } else {
-        std::cerr <<
-          "Invalid convergence metric: " +
-          convergence_metric_str +
-          ". Must be MEAN, MEAN_VAR, or HIST." << std::endl;
-        throw(0);
-    }
-    std::cout << "> Numerics.convergence_metric = " << convergenceMetricString(convergence_metric) << std::endl;
-
-    n_stat = config->get_qualified_as<unsigned int>("Numerics.stats_window").value_or(DEFAULT_STATS_WINDOW);
-    std::cout << "> Numerics.stats_window = " << n_stat << std::endl;
-    rtol = config->get_qualified_as<double>("Numerics.rtol").value_or(DEFAULT_RTOL);
-    if (rtol > 0.0)
-        std::cout << "> Numerics.rtol = " << rtol << std::endl;
-    min_steps_converge = config->get_qualified_as<unsigned int>("Numerics.min_steps_converge").value_or(DEFAULT_MIN_STEPS_CONVERGE);
-    if (min_steps_converge > 0)
-        std::cout << "> Numerics.min_steps_converge = " << min_steps_converge << std::endl;
+    n_particles = parseValue<unsigned int>(config, "Numerics.n_particles", DEFAULT_N_PARTICLES);
+    n_steps = parseValue<int>(config, "Numerics.n_steps", DEFAULT_N_STEPS);
+    t_stop = parseValue<double>(config, "Numerics.t_stop", DEFAULT_T_STOP);
+    T_extinct = parseValue<double>(config, "Numerics.T_extinct", DEFAULT_T_EXTINCT);
+    T_extinct_mode = parseEnumValue<ExtinctMode>(config, "Numerics.T_extinct_mode", extinct_mode_map, DEFAULT_T_EXTINCT_MODE);
+    dt_step = parseValue<double>(config, "Numerics.dt", DEFAULT_DT);
+    dt_sub_target = parseValue<double>(config, "Numerics.dt_sub", DEFAULT_DT_SUB);
+    convergence_metric = parseEnumValue<ConvergenceMetric>(config, "Numerics.convergence_metric", convergence_metric_map, DEFAULT_CONVERGENCE_METRIC);
+    n_stat = parseValue<unsigned int>(config, "Numerics.stats_window", DEFAULT_STATS_WINDOW);
+    rtol = parseValue<double>(config, "Numerics.rtol", DEFAULT_RTOL);
+    min_steps_converge = parseValue<int>(config, "Numerics.min_steps_converge", DEFAULT_MIN_STEPS_CONVERGE);
 
     // Models
-    std::string mixing_model_str = config->get_qualified_as<std::string>("Models.mixing_model").value_or(DEFAULT_MIX_MODEL);
-    if (mixing_model_str == "NO_MIX") {
-        mixing_model = NO_MIX;
-    } else if (mixing_model_str == "FULL_MIX") {
-        mixing_model = FULL_MIX;
-    } else if (mixing_model_str == "CURL") {
-        mixing_model = CURL;
-    } else if (mixing_model_str == "MOD_CURL") {
-        mixing_model = MOD_CURL;
-    } else if (mixing_model_str == "IEM") {
-        mixing_model = IEM;
-    } else if (mixing_model_str == "EMST_1D") {
-        mixing_model = EMST_1D;
-    } else if (mixing_model_str == "EMST") {
-        mixing_model = EMST;
-    } else if (mixing_model_str == "KER_M") {
-        mixing_model = KER_M;
-    } else {
-        std::cerr <<
-          "Invalid mixing model: " +
-          mixing_model_str +
-          ". Must be NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, or KER_M." << std::endl;
-        throw(0);
-    }
-    std::cout << "> Models.mixing_model = " << mixingModelString(mixing_model) << std::endl;
+    mixing_model = parseEnumValue<MixingModel>(config, "Models.mixing_model", mixing_model_map, DEFAULT_MIX_MODEL);
 
     // Conditions
-    std::string injection_mode_str =
-        config->get_qualified_as<std::string>("Conditions.injection_mode").value_or(DEFAULT_INJECTION_MODE);
-    if (injection_mode_str == "PREMIXED") {
-        injection_mode = PREMIXED;
-    } else if (injection_mode_str == "NONPREMIXED") {
-        injection_mode = NONPREMIXED;
-    } else {
-        std::cerr <<
-          "Invalid injection mode: " +
-          injection_mode_str +
-          ". Must be PREMIXED or NONPREMIXED." << std::endl;
-        throw(0);
-    }
-    std::cout << "> Conditions.injection_mode = " << injectionModeString(injection_mode) << std::endl;
-    pilot_flow = config->get_qualified_as<double>("Conditions.pilot_flow").value_or(DEFAULT_PILOT_FLOW);
-    std::cout << "> Conditions.pilot_flow = " << pilot_flow << std::endl;
-    pilot_t_stop = config->get_qualified_as<double>("Conditions.pilot_t_stop").value_or(DEFAULT_PILOT_T_STOP);
-    std::cout << "> Conditions.pilot_t_stop = " << pilot_t_stop << std::endl;
-    P = config->get_qualified_as<double>("Conditions.pressure").value_or(DEFAULT_PRESSURE);
-    std::cout << "> Conditions.pressure = " << P << std::endl;
-    comp_fuel = config->get_qualified_as<std::string>("Conditions.comp_fuel").value_or(DEFAULT_COMP_FUEL);
-    std::cout << "> Conditions.comp_fuel = " << comp_fuel << std::endl;
-    comp_ox = config->get_qualified_as<std::string>("Conditions.comp_ox").value_or(DEFAULT_COMP_OX);
-    std::cout << "> Conditions.comp_ox = " << comp_ox << std::endl;
-    T_fuel = config->get_qualified_as<double>("Conditions.T_fuel").value_or(DEFAULT_T_FUEL);
-    std::cout << "> Conditions.T_fuel = " << T_fuel << std::endl;
-    T_ox = config->get_qualified_as<double>("Conditions.T_ox").value_or(DEFAULT_T_OX);
-    std::cout << "> Conditions.T_ox = " << T_ox << std::endl;
-    phi_global = config->get_qualified_as<double>("Conditions.phi_global").value_or(DEFAULT_PHI_GLOBAL);
-    std::cout << "> Conditions.phi_global = " << phi_global << std::endl;
-    std::string tau_res_mode_str = config->get_qualified_as<std::string>("Conditions.tau_res_mode").value_or(DEFAULT_TAU_RES_MODE);
-    if (tau_res_mode_str == "EXP_MEAN") {
-        tau_res_mode = EXP_MEAN;
-    } else if (tau_res_mode_str == "DISTRIBUTION") {
-        tau_res_mode = DISTRIBUTION;
-    } else {
-        std::cerr <<
-          "Invalid tau_res mode: " +
-          tau_res_mode_str +
-          ". Must be EXP_MEAN or DISTRIBUTION." << std::endl;
-        throw(0);
-    }
-    std::cout << "> Conditions.tau_res_Mode = " << tauResModeString(tau_res_mode) << std::endl;
+    injection_mode = parseEnumValue<InjectionMode>(config, "Conditions.injection_mode", injection_mode_map, DEFAULT_INJECTION_MODE);
+    pilot_flow = parseValue<double>(config, "Conditions.pilot_flow", DEFAULT_PILOT_FLOW);
+    pilot_t_stop = parseValue<double>(config, "Conditions.pilot_t_stop", DEFAULT_PILOT_T_STOP);
+    P = parseValue<double>(config, "Conditions.pressure", DEFAULT_PRESSURE);
+    comp_fuel = parseValue<std::string>(config, "Conditions.comp_fuel", DEFAULT_COMP_FUEL);
+    comp_ox = parseValue<std::string>(config, "Conditions.comp_ox", DEFAULT_COMP_OX);
+    T_fuel = parseValue<double>(config, "Conditions.T_fuel", DEFAULT_T_FUEL);
+    T_ox = parseValue<double>(config, "Conditions.T_ox", DEFAULT_T_OX);
+    phi_global = parseValue<double>(config, "Conditions.phi_global", DEFAULT_PHI_GLOBAL);
+    tau_res_mode = parseEnumValue<TauResMode>(config, "Conditions.tau_res_mode", tau_res_mode_map, DEFAULT_TAU_RES_MODE);
     switch(tau_res_mode) {
-        case EXP_MEAN: {
-            tau_res_value = config->get_qualified_as<double>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_VALUE);
-            std::cout << "> Conditions.tau_res = " << tau_res_value << std::endl;
+        case TauResMode::EXP_MEAN: {
+            tau_res_value = parseValue<double>(config, "Conditions.tau_res", DEFAULT_TAU_RES_VALUE);
             break;
         }
-        case DISTRIBUTION: {
-            tau_res_hist_name = config->get_qualified_as<std::string>("Conditions.tau_res").value_or(DEFAULT_TAU_RES_HIST_NAME);
-            std::cout << "> Conditions.tau_res = " << tau_res_hist_name << std::endl;
+        case TauResMode::DISTRIBUTION: {
+            tau_res_hist_name = parseValue<std::string>(config, "Conditions.tau_res", DEFAULT_TAU_RES_HIST_NAME);
             break;
         }
         default: {
             break;
         }
     }
-    tau_mix = config->get_qualified_as<double>("Conditions.tau_mix").value_or(DEFAULT_TAU_MIX);
-    std::cout << "> Conditions.tau_mix = " << tau_mix << std::endl;
+    tau_mix = parseValue<double>(config, "Conditions.tau_mix", DEFAULT_TAU_MIX);
 
     // Output
-    check_interval = config->get_qualified_as<unsigned int>("Output.check_interval").value_or(DEFAULT_CHECK_INTERVAL);
-    std::cout << "> Output.check_interval = " << check_interval << std::endl;
-    std::vector<std::string> check_variable_names_ = config->get_qualified_array_of<std::string>(
-        "Output.check_variable_names").value_or(DEFAULT_CHECK_VARIABLE_NAMES);
-    if (check_variable_names_.size() > 0) {
-        check_variable_names.assign(check_variable_names_.begin(), check_variable_names_.end());
-        std::cout << "> Output.check_variable_names: ";
-        std::for_each(check_variable_names.begin(), check_variable_names.end(), [](std::string n){ std::cout << n << ", "; });
-        std::cout << std::endl;
-    }
-    check_verbose = config->get_qualified_as<bool>("Output.check_verbose").value_or(DEFAULT_CHECK_VERBOSE);
-    std::cout << "> Output.check_verbose = " << check_verbose << std::endl;
-    write_raw_interval = config->get_qualified_as<unsigned int>("Output.write_raw_interval").value_or(DEFAULT_WRITE_INTERVAL);
-    if (write_raw_interval < 0) {
-        write_raw_interval = n_stat;
-    }
-    std::cout << "> Output.write_raw_interval = " << write_raw_interval << std::endl;
-    if (write_raw_interval < n_stat) {
-        std::cout << "WARNING: write_raw_interval < stats_window will result in duplicate data. " <<
-            "Recommend write_raw_interval = stats_window" << std::endl;
-    }
-    write_stats_interval = config->get_qualified_as<unsigned int>("Output.write_stats_interval").value_or(DEFAULT_WRITE_INTERVAL);
-    if (write_stats_interval < 0) write_stats_interval = check_interval;
-    std::cout << "> Output.write_stats_interval = " << write_stats_interval << std::endl;
+    check_interval = parseValue<unsigned int>(config, "Output.check_interval", DEFAULT_CHECK_INTERVAL);
+    check_variable_names = parseArray<std::string>(config, "Output.check_variable_names", DEFAULT_CHECK_VARIABLE_NAMES);
+    check_verbose = parseValue<bool>(config, "Output.check_verbose", DEFAULT_CHECK_VERBOSE);
+    write_raw_interval = parseValue<unsigned int>(config, "Output.write_raw_interval", DEFAULT_WRITE_INTERVAL);
+    write_stats_interval = parseValue<unsigned int>(config, "Output.write_stats_interval", DEFAULT_WRITE_INTERVAL);
 
     std::cout << "--------------------------------------------------" << std::endl;
 }
@@ -208,7 +125,7 @@ void PartiallyStirredReactor::initialize() {
     rerror = std::numeric_limits<double>::infinity();
 
     // Create residence time histogram, if necessary
-    if (tau_res_mode == DISTRIBUTION) {
+    if (tau_res_mode == TauResMode::DISTRIBUTION) {
         tau_res_hist.readHist(tau_res_hist_name);
         tau_res_hist.generatePDF();
         tau_res_hist.generateCDF();
@@ -217,11 +134,11 @@ void PartiallyStirredReactor::initialize() {
     // Set step sizes
     if (dt_step <= 0.0) {
         switch(tau_res_mode) {
-            case EXP_MEAN: {
+            case TauResMode::EXP_MEAN: {
                 dt_step = 0.1 * std::min(tau_res_value, tau_mix);
                 break;
             }
-            case DISTRIBUTION: {
+            case TauResMode::DISTRIBUTION: {
                 double tau_res_10 = tau_res_hist.percentileToValue(0.1);
                 std::cout << "10th percentile residence time: " << tau_res_10 << std::endl;
                 dt_step = 0.1 * std::min(tau_res_10, tau_mix);
@@ -231,7 +148,7 @@ void PartiallyStirredReactor::initialize() {
         }
 
         // EMST mixing models require a smaller time step
-        if ((mixing_model == EMST_1D) || (mixing_model == EMST)) {
+        if ((mixing_model == MixingModel::EMST_1D) || (mixing_model == MixingModel::EMST)) {
             dt_step /= 5;
         }
 
@@ -339,12 +256,12 @@ void PartiallyStirredReactor::initialize() {
             }
 
             switch(tau_res_mode) {
-                case EXP_MEAN: {
+                case TauResMode::EXP_MEAN: {
                     pvec[ip].setAge(0.0);
                     pvec[ip].setTauRes(0.0); // TODO - figure out how to compute this in this mode
                     break;
                 }
-                case DISTRIBUTION: {
+                case TauResMode::DISTRIBUTION: {
                     pvec[ip].setAge(0.0);
                     pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
                     break;
@@ -415,7 +332,7 @@ void PartiallyStirredReactor::initialize() {
     injvec[0].setFlow(pilot_flow);
 
     switch(injection_mode) {
-        case PREMIXED: {
+        case InjectionMode::PREMIXED: {
             injvec.push_back(Injector(1, n_species));
 
             // Premix injector
@@ -424,7 +341,7 @@ void PartiallyStirredReactor::initialize() {
             injvec[1].setFlow(1.0 - pilot_flow);
             break;
         }
-        case NONPREMIXED: {
+        case InjectionMode::NONPREMIXED: {
             for (int iinj = 1; iinj < 3; iinj++) {
                 injvec.push_back(Injector(iinj, n_species));
             }
@@ -673,7 +590,7 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
     int n_recycled_ = 0;
     int n_recycled_check_ = n_recycled_check;
     switch(tau_res_mode) {
-        case EXP_MEAN: {
+        case TauResMode::EXP_MEAN: {
             // Random choice formulation
             p_out += n_particles * dt / tau_res_value; // Fractional particle count to recycle
             int np_out = std::round(p_out); // Round to integer
@@ -716,7 +633,7 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
             }
             break;
         }
-        case DISTRIBUTION: {
+        case TauResMode::DISTRIBUTION: {
             // Life expectancy formulation
 #pragma omp parallel reduction(+:n_recycled_,n_recycled_check_)
             {
@@ -742,11 +659,11 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
 
 void PartiallyStirredReactor::subStepMix(double dt) {
     switch(mixing_model) {
-        case NO_MIX: {
+        case MixingModel::NO_MIX: {
             // Do nothing
             break;
         }
-        case FULL_MIX: {
+        case MixingModel::FULL_MIX: {
             meanState(&xtemp1, false, true);
             // Set all particles to Favre mean state
 #pragma omp parallel for
@@ -755,7 +672,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             }
             break;
         }
-        case CURL: {
+        case MixingModel::CURL: {
             // Compute how many pairs to mix
             p_mix += n_particles * dt / tau_mix;
             int np_mix = std::round(p_mix);
@@ -778,7 +695,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             }
             break;
         }
-        case MOD_CURL: {
+        case MixingModel::MOD_CURL: {
             // Compute how many pairs to mix
             p_mix += n_particles * dt / tau_mix;
             int np_mix = std::round(p_mix);
@@ -801,7 +718,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             }
             break;
         }
-        case IEM: {
+        case MixingModel::IEM: {
             // meanState(&xtemp1, false, true);
             meanState(&xtemp1, false, false); // DEBUG
             Particle pmean;
@@ -813,7 +730,7 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             }
             break;
         }
-        case EMST_1D: {
+        case MixingModel::EMST_1D: {
             int ip_m, ip_n;
             double Wi, Wv;
             double dt_save = dt;
@@ -941,12 +858,12 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             }
             break;
         }
-        case EMST: {
+        case MixingModel::EMST: {
             throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
                                                "EMST not implemented.");
             break;
         }
-        case KER_M: {
+        case MixingModel::KER_M: {
             throw Cantera::NotImplementedError("PartiallyStirredReactor::subStepMix",
                                                "KER_M not implemented.");
             break;
@@ -987,11 +904,11 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
     pvec[ip].setInjID(iinj);
     pvec[ip].setAge(0.0);
     switch(tau_res_mode) {
-        case EXP_MEAN: {
+        case TauResMode::EXP_MEAN: {
             pvec[ip].setTauRes(0.0);
             break;
         }
-        case DISTRIBUTION: {
+        case TauResMode::DISTRIBUTION: {
             pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
             break;
         }
@@ -1003,7 +920,7 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
 
 void PartiallyStirredReactor::calcConvergence() {
     switch(convergence_metric) {
-        case MEAN: {
+        case ConvergenceMetric::MEAN: {
             meanState(&xtemp1, true, true);
             rerror = 0.0;
             for (int iv = 0; iv < n_state_variables; iv++) {
@@ -1012,7 +929,7 @@ void PartiallyStirredReactor::calcConvergence() {
             rerror = std::sqrt(rerror);
             break;
         }
-        case MEAN_VAR: {
+        case ConvergenceMetric::MEAN_VAR: {
             meanState(&xtemp1, true, true);
             varianceState(&xtemp2, &xtemp1, true);
             rerror = 0.0;
@@ -1023,7 +940,7 @@ void PartiallyStirredReactor::calcConvergence() {
             rerror = std::sqrt(rerror);
             break;
         }
-        case HIST: {
+        case ConvergenceMetric::HIST: {
             throw Cantera::NotImplementedError("PartiallyStirredReactor::calcConvergence",
                                                "MEAN_VAR not implemented.");
             break;
@@ -1049,11 +966,25 @@ bool PartiallyStirredReactor::runDone() {
             rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
         return true;
     }
-    double fmeanT = mean(variableIndex("T"), true, true);
-    if (fmeanT < T_EXTINCT) {
-        std::cout << "Reached termination condition: fmean(T) (" <<
-            fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
-        return true;
+    if ((T_extinct > 0.0)) {
+        switch(T_extinct_mode) {
+            case ExtinctMode::MEAN: {
+                double fmeanT = mean(variableIndex("T"), true, true);
+                if (fmeanT < T_extinct) {
+                    std::cout << "Reached termination condition: fmean(T) (" <<
+                        fmeanT << ") <= T_extinct (" << T_extinct << ") at step " << step << std::endl;
+                    return true;
+                }
+            }
+            case ExtinctMode::MAX: {
+                double maxT = max(variableIndex("T"), true);
+                if (maxT < T_extinct) {
+                    std::cout << "Reached termination condition: max(T) (" <<
+                        maxT << ") <= T_extinct (" << T_extinct << ") at step " << step << std::endl;
+                    return true;
+                }
+            }
+        }
     }
     return false;
 }
@@ -1086,7 +1017,7 @@ void PartiallyStirredReactor::writeRawHeaders() {
 }
 
 void PartiallyStirredReactor::writeRaw(bool force) {
-    if ((!force) && (step % write_raw_interval != 0)) return;
+    if ((!force) && ((write_raw_interval < 0) || (step % write_raw_interval != 0))) return;
 
     std::ofstream file;
     file.open(RAW_NAME + RAW_EXT, std::ios_base::app);
@@ -1198,16 +1129,16 @@ void PartiallyStirredReactor::addVariable(
         std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter,
         VariableType type) {
     switch(type) {
-        case STATE: {
+        case VariableType::STATE: {
             throw Cantera::CanteraError("PartiallyStirredReactor::addVariable",
                                         "STATE type variables cannot be added manually.");
             break;
         }
-        case AUX: {
+        case VariableType::AUX: {
             addAuxVariable(name, getter);
             break;
         }
-        case DERIVED: {
+        case VariableType::DERIVED: {
             addDerivedVariable(name, getter);
             break;
         }

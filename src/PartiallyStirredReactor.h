@@ -3,12 +3,15 @@
 #include <vector>
 #include <functional>
 #include <random>
+#include <unordered_map>
 
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
 #include "cantera/thermo/ThermoPhase.h"
 #include "cantera/zeroD/IdealGasConstPressureReactor.h"
 #include "cantera/zeroD/ReactorNet.h"
+
+#include "../cpptoml/include/cpptoml.h"
 
 #include "Histogram.h"
 #include "Injector.h"
@@ -21,6 +24,8 @@ const double DEFAULT_P_STOICH = 0.6;
 const int DEFAULT_N_PARTICLES = 100;
 const int DEFAULT_N_STEPS = -1;
 const double DEFAULT_T_STOP = -1.0;
+const double DEFAULT_T_EXTINCT = -1.0;
+const std::string DEFAULT_T_EXTINCT_MODE = "MEAN";
 const double DEFAULT_DT = -1.0;
 const double DEFAULT_DT_SUB = -1.0;
 const std::string DEFAULT_CONVERGENCE_METRIC = "MEAN";
@@ -47,11 +52,50 @@ const std::vector<std::string> DEFAULT_CHECK_VARIABLE_NAMES{};
 const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
 
-enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
-enum InjectionMode {PREMIXED, NONPREMIXED};
-enum ConvergenceMetric {MEAN, MEAN_VAR, HIST};
-enum TauResMode {EXP_MEAN, DISTRIBUTION};
-enum VariableType {STATE, AUX, DERIVED};
+enum class MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
+enum class InjectionMode {PREMIXED, NONPREMIXED};
+enum class ConvergenceMetric {MEAN, MEAN_VAR, HIST};
+enum class ExtinctMode {MEAN, MAX, _COUNT};
+enum class TauResMode {EXP_MEAN, DISTRIBUTION};
+enum class VariableType {STATE, AUX, DERIVED};
+
+const std::unordered_map<std::string, MixingModel> mixing_model_map = {
+    {"NO_MIX", MixingModel::NO_MIX},
+    {"FULL_MIX", MixingModel::FULL_MIX},
+    {"CURL", MixingModel::CURL},
+    {"MOD_CURL", MixingModel::MOD_CURL},
+    {"IEM", MixingModel::IEM},
+    {"EMST_1D", MixingModel::EMST_1D},
+    {"EMST", MixingModel::EMST},
+    {"KER_M", MixingModel::KER_M}
+};
+
+const std::unordered_map<std::string, InjectionMode> injection_mode_map = {
+    {"PREMIXED", InjectionMode::PREMIXED},
+    {"NONPREMIXED", InjectionMode::NONPREMIXED}
+};
+
+const std::unordered_map<std::string, ConvergenceMetric> convergence_metric_map = {
+    {"MEAN", ConvergenceMetric::MEAN},
+    {"MEAN_VAR", ConvergenceMetric::MEAN_VAR},
+    {"HIST", ConvergenceMetric::HIST}
+};
+
+const std::unordered_map<std::string, ExtinctMode> extinct_mode_map = {
+    {"MEAN", ExtinctMode::MEAN},
+    {"MAX", ExtinctMode::MAX}
+};
+
+const std::unordered_map<std::string, TauResMode> tau_res_mode_map = {
+    {"EXP_MEAN", TauResMode::EXP_MEAN},
+    {"DISTRIBUTION", TauResMode::DISTRIBUTION}
+};
+
+const std::unordered_map<std::string, VariableType> variable_type_map = {
+    {"STATE", VariableType::STATE},
+    {"AUX", VariableType::AUX},
+    {"DERIVED", VariableType::DERIVED}
+};
 
 const std::string RAW_NAME = "particle_data";
 const std::string RAW_EXT = ".csv";
@@ -60,7 +104,6 @@ const std::string STATS_PREFIX = "stats_";
 const std::string STATS_EXT = ".csv";
 
 const int WRITE_PRECISION = 15;
-const double T_EXTINCT = 500.0;
 
 #pragma omp declare \
     reduction( \
@@ -106,6 +149,19 @@ public:
 
 protected:
     void parseInput();
+    template <typename T> T parseValue(
+        std::shared_ptr<cpptoml::table> input,
+        std::string name,
+        T default_value);
+    template <typename T> T parseEnumValue(
+        std::shared_ptr<cpptoml::table> input,
+        std::string name,
+        std::unordered_map<std::string, T> enum_map,
+        std::string default_value_str);
+    template <typename T> std::vector<T> parseArray(
+        std::shared_ptr<cpptoml::table> input,
+        std::string name,
+        std::vector<T> default_value);
     void readRestart();
     void takeStep();
     void calcDt();
@@ -142,45 +198,6 @@ protected:
     double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false, bool favre=true);
     void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
 
-    std::string convergenceMetricString(ConvergenceMetric convergence_metric_) {
-        switch (convergence_metric_) {
-            case MEAN: return "MEAN";
-            case MEAN_VAR: return "MEAN_VAR";
-            case HIST: return "HIST";
-            default: throw std::runtime_error("Invalid ID: " + convergence_metric_);
-        }
-    }
-
-    std::string mixingModelString(MixingModel mixing_model_) {
-        switch (mixing_model_) {
-            case NO_MIX: return "NO_MIX";
-            case FULL_MIX: return "FULL_MIX";
-            case CURL: return "CURL";
-            case MOD_CURL: return "MOD_CURL";
-            case IEM: return "IEM";
-            case EMST_1D: return "EMST_1D";
-            case EMST: return "EMST";
-            case KER_M: return "KER_M";
-            default: throw std::runtime_error("Invalid ID: " + mixing_model_);
-        }
-    }
-
-    std::string injectionModeString(InjectionMode injection_mode_) {
-        switch (injection_mode_) {
-            case PREMIXED: return "PREMIXED";
-            case NONPREMIXED: return "NONPREMIXED";
-            default: throw std::runtime_error("Invalid ID: " + injection_mode_);
-        }
-    }
-
-    std::string tauResModeString(TauResMode tau_res_mode_) {
-        switch (tau_res_mode_) {
-            case EXP_MEAN: return "EXP_MEAN";
-            case DISTRIBUTION: return "DISTRIBUTION";
-            default: throw std::runtime_error("Invalid ID: " + tau_res_mode_);
-        }
-    }
-
     std::string input_filename;
     std::string mech_filename;
     bool restart;
@@ -191,6 +208,8 @@ protected:
     int n_substeps;
     int min_steps_converge;
     double t_stop;
+    double T_extinct;
+    ExtinctMode T_extinct_mode;
     double dt_step;
     int n_sub;
     double dt_sub, dt_sub_target;
