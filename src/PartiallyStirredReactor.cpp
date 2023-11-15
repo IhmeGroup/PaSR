@@ -13,7 +13,7 @@
 
 #ifdef __APPLE__
 #include <filesystem>
-namespace fs = std::__fs::filesystem;
+namespace fs = std::filesystem;
 #else
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
@@ -260,12 +260,14 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize ReactorNet for each thread
     std::cout << "Initializing ReactorNet for each thread..." << std::endl;
+    std::cout << omp_get_max_threads() << std::endl;
     solvec.resize(omp_get_max_threads());
     gasvec.resize(omp_get_max_threads());
     reactorvec.resize(omp_get_max_threads());
     rnetvec.resize(omp_get_max_threads());
 #pragma omp parallel for
     for (int it = 0; it < omp_get_max_threads(); it++) {
+        std::cout << "Thread: " << omp_get_thread_num() << std::endl;
         solvec[it] = Cantera::newSolution(mech_filename);
         gasvec[it] = solvec[it]->thermo();
         reactorvec[it] = new Cantera::IdealGasConstPressureReactor();
