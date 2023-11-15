@@ -570,6 +570,7 @@ void PartiallyStirredReactor::takeStep() {
     // Turn off pilot if pilot_t_stop reached
     if ((pilot_t_stop > 0.0) && (t >= pilot_t_stop)) {
         injvec[0].setFlow(0.0);
+        normalizeInjectors();
     }
 
     // Write data (force if run is complete)
@@ -1000,6 +1001,17 @@ void PartiallyStirredReactor::copyState() {
     } else {
         i_stat++;
     }
+}
+
+void PartiallyStirredReactor::normalizeInjectors() {
+    double flow_sum = 0.0;
+    for (auto& inj : injvec) {
+        flow_sum += inj.getFlow();
+    }
+    for (auto& inj : injvec) {
+        inj.setFlow(inj.getFlow() / flow_sum);
+    }
+
 }
 
 void PartiallyStirredReactor::writeRawHeaders() {

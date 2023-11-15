@@ -173,6 +173,7 @@ protected:
     void calcConvergence();
     bool runDone();
     void copyState();
+    void normalizeInjectors();
     std::string statsPath(std::string name);
     void writeStatsHeaders();
     void writeStats(bool force=false);
