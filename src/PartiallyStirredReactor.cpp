@@ -23,7 +23,7 @@ PartiallyStirredReactor::PartiallyStirredReactor(const std::string& input_filena
     input_filename(input_filename_), run_done(false),
     step(0), t(0.0), p_out(0.0), i_stat(1), id_iterator(0), n_particles(0),
     n_state_variables(0), n_aux_variables(0), n_derived_variables(0), n_species(0),
-    particles_injected(false), n_recycled(0), n_recycled_check(0)
+    particles_injected(false), n_recycled(0), n_recycled_check(0), n_inject(0), n_inject_check(0)
 {
     parseInput();
 }
@@ -202,10 +202,20 @@ void PartiallyStirredReactor::parseInput() {
     if (write_stats_interval < 0) write_stats_interval = check_interval;
     std::cout << "> Output.write_stats_interval = " << write_stats_interval << std::endl;
 
+    use_droplet_array = config->get_qualified_as<bool>("DropletArray.use_droplet_array").value_or(DEFAULT_USE_DROPLETARRAY);
+    std::cout << "> DropletArray.use_droplet_array = " << use_droplet_array << std::endl;
+    if (use_droplet_array) {
+        this->Ts = config->get_qualified_as<double>("DropletArray.Ts").value_or(DEFAULT_TS);
+        std::cout << "> DropletArray.Ts = " << this->Ts << std::endl;
+    }
+
     std::cout << "--------------------------------------------------" << std::endl;
 }
 
 void PartiallyStirredReactor::initialize() {
+    if (use_droplet_array)
+        this->droplet_array.initialize(input_filename);
+
     step = 0;
     t = 0.0;
     p_out = 0.0;
@@ -319,46 +329,97 @@ void PartiallyStirredReactor::initialize() {
 
     // Initialize particles
     std::cout << "Initializing particles..." << std::endl;
-    int np_phi_equil = std::round(p_phi_equil * n_particles);
+    if (!this->use_droplet_array) {
+            int np_phi_equil = std::round(p_phi_equil * n_particles);
 
 #pragma omp parallel
-    {
-        int tid = omp_get_thread_num();
+        {
+            int tid = omp_get_thread_num();
 #pragma omp for
-        for (int ip = 0; ip < n_particles; ip++) {
-            pvec[ip].setP(&P);
-            pvec[ip].setID(id_iterator++);
-            pvec[ip].setInjID(-1);
-            pvec[ip].setnSpecies(n_species);
-            pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
+            for (int ip = 0; ip < n_particles; ip++) {
+                pvec[ip].setP(&P);
+                pvec[ip].setID(id_iterator++);
+                pvec[ip].setInjID(-1);
+                pvec[ip].setnSpecies(n_species);
+                pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
-            if (ip < np_phi_equil) {
-                pvec[ip].seth(h_equil);
-                pvec[ip].setY(Y_equil.data());
-            } else {
-                double Z = (double)(ip - np_phi_equil) / (double)(n_particles - np_phi_equil);
-                double h = h_fuel * Z + h_ox * (1 - Z);
-                gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
-                gasvec[tid]->setState_HP(h, P);
-                gasvec[tid]->equilibrate("HP");
-                pvec[ip].seth(gasvec[tid]->enthalpy_mass());
-                pvec[ip].setY(gasvec[tid]->massFractions());
-            }
-
-            switch(tau_res_mode) {
-                case EXP_MEAN: {
-                    pvec[ip].setAge(0.0);
-                    pvec[ip].setTauRes(0.0); // TODO - figure out how to compute this in this mode
-                    break;
+                if (ip < np_phi_equil) {
+                    pvec[ip].seth(h_equil);
+                    pvec[ip].setY(Y_equil.data());
+                } else {
+                    double Z = (double)(ip - np_phi_equil) / (double)(n_particles - np_phi_equil);
+                    double h = h_fuel * Z + h_ox * (1 - Z);
+                    gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
+                    gasvec[tid]->setState_HP(h, P);
+                    gasvec[tid]->equilibrate("HP");
+                    pvec[ip].seth(gasvec[tid]->enthalpy_mass());
+                    pvec[ip].setY(gasvec[tid]->massFractions());
                 }
-                case DISTRIBUTION: {
-                    pvec[ip].setAge(0.0);
-                    pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
-                    break;
+
+                switch(tau_res_mode) {
+                    case EXP_MEAN: {
+                        pvec[ip].setAge(0.0);
+                        pvec[ip].setTauRes(0.0); // TODO - figure out how to compute this in this mode
+                        break;
+                    }
+                    case DISTRIBUTION: {
+                        pvec[ip].setAge(0.0);
+                        pvec[ip].setTauRes(tau_res_hist.rand(dists_uni_real[tid], rand_engines[tid]));
+                        break;
+                    }
                 }
             }
         }
+    } else {
+        std::cout << "Overriding for DropletArray..." << std::endl;
+        this->n_air_particles = (int) ((1.-Zeq) * n_particles);
+        this->n_fuel_particles = this->n_particles - this->n_air_particles;
+        this->n_curr_particles = this->n_air_particles;
+
+        double total_liq_mass = this->droplet_array.get_initial_mass();
+        this->m_quant = total_liq_mass / this->n_fuel_particles;
+
+        std::cout << "> n_air_particles = " << this->n_air_particles << std::endl;
+        std::cout << "> n_fuel_particles = " << this->n_fuel_particles << std::endl;
+
+#pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+#pragma omp for
+            for (int ip = 0; ip < n_particles; ip++) {
+                pvec[ip].setP(&P);
+                pvec[ip].setID(id_iterator++);
+                pvec[ip].setInjID(-1);
+                pvec[ip].setnSpecies(n_species);
+                pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
+
+                double Z;
+                if (ip < n_air_particles)
+                    Z = 0.;
+                else
+                    Z = 1.;
+
+                double T;
+                if (ip < n_air_particles)
+                    T = Ts + (T_ox-Ts) * (double)(ip) / (double)(n_air_particles - 1);
+                else
+                    T = T_fuel;
+
+                // Debug
+                // T = 1000.;
+
+                gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
+                gasvec[tid]->setState_TP(T, P);
+                pvec[ip].seth(gasvec[tid]->enthalpy_mass());
+                pvec[ip].setY(gasvec[tid]->massFractions());
+
+                // These don't matter since closed system
+                pvec[ip].setAge(0.0);
+                pvec[ip].setTauRes(0.0);
+            }
+        }
     }
+
 
     // Initialize variable functions
     for (int iv = 0; iv < n_state_variables; iv++) {
@@ -598,6 +659,13 @@ void PartiallyStirredReactor::check(bool force) {
     std::cout << "--------------------------------------------------" << std::endl;
 
     n_recycled_check = 0;
+
+    if (this->use_droplet_array) {
+        std::cout << "> n_inject = " << this->n_inject << " last step, " <<
+            this->n_inject_check << " since last check" << std::endl;
+        std::cout << "> n_curr_particles = " << this->n_curr_particles << std::endl;
+        std::cout << "> curr_fuel_particles = " << this->n_curr_particles - this->n_air_particles << std::endl;
+    }
 }
 
 std::string PartiallyStirredReactor::variableName(int iv) {
@@ -635,10 +703,21 @@ void PartiallyStirredReactor::takeStep() {
     calcDt();
 
     // Take substeps
+
+    // Step the droplet array and inject if possible
+    if (this->use_droplet_array) {
+        this->droplet_array.take_step(dt_step);
+        this->injectParticles();
+    }
+
     // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     subStepInflow(dt_step);
     // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     for (int isub = 0; isub < n_sub; isub++) {
+        // Effect from hot wall heating
+        // if (this->use_droplet_array)
+            wall_heat(dt_sub);
+
         subStepMix(dt_sub);
         // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
         subStepReact(dt_sub);
@@ -660,6 +739,9 @@ void PartiallyStirredReactor::takeStep() {
     // Write data (force if run is complete)
     writeRaw(run_done);
     writeStats(run_done);
+
+    if (run_done)
+        this->droplet_array.write_output("test.csv");
 }
 
 void PartiallyStirredReactor::calcDt() {
@@ -671,7 +753,50 @@ void PartiallyStirredReactor::calcDt() {
     dt_sub = dt_step / n_sub;
 }
 
+void PartiallyStirredReactor::injectParticles() {
+    int n_inject_ = this->droplet_array.inject(this->m_quant);
+
+    this->n_curr_particles += n_inject_;
+
+    this->n_inject = n_inject_;
+    this->n_inject_check += n_inject_;
+
+    // Debug
+    // this->n_curr_particles = this->n_particles;
+}
+
+void PartiallyStirredReactor::wall_heat(double dt) {
+    // First attempt: heat transfer implemented a * (T - T_target)
+    // where T_target is obtained from random distribution between Ts and T_ox
+    // a is obtained from tau_mix as follows: a = dt / tau_mix
+
+// #pragma omp parallel
+//     {
+//         int tid = omp_get_thread_num();
+// #pragma omp for
+//         for (int ip = 0; ip < n_curr_particles; ++ip) {
+//             double T_target = dists_uni_real[tid](rand_engines[tid]) * (T_ox - Ts) + Ts;
+//             double a = dt / tau_mix;
+//             double T = pvec[ip].T(gasvec[tid]);
+//             double dT = a * (T_target - T);
+//             pvec[ip].setT(T + dT, gasvec[tid]);
+//         }
+//     }
+
+    // First attempt no good since it would over time set temperatures to the mean between Tox and Ts
+    // Second attempt: Fix the id = 0 particle to Ts and let the others equilibrate through mixing
+    double T_target = Ts;
+    double a = dt / tau_mix;
+    double T = pvec[0].T(gasvec[0]);
+    double dT = a * (T_target - T);
+    pvec[0].setT(T + dT, gasvec[0]);
+}
+
 void PartiallyStirredReactor::subStepInflow(double dt) {
+    // Do nothing when running with droplet array
+    if (this->use_droplet_array)
+        return;
+
     int n_recycled_ = 0;
     int n_recycled_check_ = n_recycled_check;
     switch(tau_res_mode) {
@@ -743,6 +868,37 @@ void PartiallyStirredReactor::subStepInflow(double dt) {
 }
 
 void PartiallyStirredReactor::subStepMix(double dt) {
+    if (this->use_droplet_array) {
+        // Compute how many pairs to mix
+        p_mix += n_curr_particles * dt / tau_mix;
+        int np_mix = std::round(p_mix);
+        p_mix -= np_mix;
+#pragma omp parallel
+        {
+            int tid = omp_get_thread_num();
+            // Update distributions
+            dists_uni_int[tid] = std::uniform_int_distribution<unsigned int>(0, n_curr_particles-1);
+#pragma omp for
+            // Iterate over pairs and mix
+            for (int ipair = 0; ipair < np_mix; ipair++) {
+                // TODO: particle weights are not used
+                unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
+                unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
+                // Assert that the particles are not above n_curr_particles
+                if (ip1 >= n_curr_particles || ip2 >= n_curr_particles) {
+                    std::cout << "ERROR: Mixing particles out of bounds." << std::endl;
+                    throw(0);
+                }
+                double a = dists_uni_real[tid](rand_engines[tid]);
+                pvec_partemp[tid] = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip2]) /
+                    (pvec[ip1].getMass() + pvec[ip2].getMass());
+                pvec[ip1] = pvec_partemp[tid];
+                pvec[ip2] = pvec_partemp[tid];
+            }
+        }
+        return;
+    }
+
     switch(mixing_model) {
         case NO_MIX: {
             // Do nothing
@@ -961,8 +1117,9 @@ void PartiallyStirredReactor::subStepMix(double dt) {
 }
 
 void PartiallyStirredReactor::subStepReact(double dt) {
+    int n_react = (this->use_droplet_array) ? n_curr_particles : n_particles;
 #pragma omp parallel for
-    for (int ip = 0; ip < n_particles; ip++) {
+    for (int ip = 0; ip < n_react; ip++) {
         // Use the current thread's reactor for calculation
         pvec[ip].react(rnetvec[omp_get_thread_num()], dt);
     }
@@ -1046,16 +1203,18 @@ bool PartiallyStirredReactor::runDone() {
         std::cout << "Reached termination condition: t >= t_stop at step " << step << std::endl;
         return true;
     }
-    if ((rerror <= rtol) && (step >= min_steps_converge) && (particles_injected)) {
-        std::cout << "Reached termination condition: rerror (" <<
-            rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
-        return true;
-    }
-    double fmeanT = mean(variableIndex("T"), true, true);
-    if (fmeanT < T_EXTINCT) {
-        std::cout << "Reached termination condition: fmean(T) (" <<
-            fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
-        return true;
+    if (!this->use_droplet_array) {
+        if ((rerror <= rtol) && (step >= min_steps_converge) && (particles_injected)) {
+            std::cout << "Reached termination condition: rerror (" <<
+                rerror << ") <= rtol (" << rtol << ") at step " << step << std::endl;
+            return true;
+        }
+        double fmeanT = mean(variableIndex("T"), true, true);
+        if (fmeanT < T_EXTINCT) {
+            std::cout << "Reached termination condition: fmean(T) (" <<
+                fmeanT << ") <= T_EXTINCT (" << T_EXTINCT << ") at step " << step << std::endl;
+            return true;
+        }
     }
     return false;
 }

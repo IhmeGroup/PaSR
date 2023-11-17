@@ -7,6 +7,14 @@
 #include <arkode/arkode_erkstep.h>
 #include <nvector/nvector_serial.h>
 
+const int DEFAUlT_N = 1000;
+const double DEFAUlT_R0 = 0.0013801623456003516;
+const double DEFAUlT_k_e = 0.9/4.;
+const double DEFAUlT_Re_scale = 29059.82905982906;
+const double DEFAUlT_c = 20.;
+const double DEFAUlT_omega = 0.22;
+const double DEFAUlT_rho_l = 1000.;
+
 class DropletArraySolver;
 
 class DropletArray {
@@ -15,7 +23,9 @@ class DropletArray {
 
     ~DropletArray();
 
-    void initialize(int N, double R0, double k_e, double Re_scale, double c, double omega);
+    void initialize(std::string input_file);
+
+    void initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l);
 
     void computeRHS();
 
@@ -25,9 +35,17 @@ class DropletArray {
     inline void set_N_r2(int i, double val) { this->N_r2_arr[i] = val; }
     inline double get_ddt_N_r2(int i) const { return this->ddt_N_r2_arr[i]; }
 
-    void reset_to_N0() { this->N_r2_arr = this->N0_r2_arr; }
-
+    // For testing only
     void solve_to_time(double tend);
+
+    // For interaction with PaSR
+    inline double get_initial_mass() {
+      return this->rho_l * 4. / 3. * 3.1415 * this->R0 * this->R0 * this->R0;
+    }
+
+    void reset_to_N0();
+    void take_step(double dt_phys);
+    int inject(double m_quant);
 
     void write_output(std::string filename);
 
@@ -44,6 +62,12 @@ class DropletArray {
       return integral;
     }
 
+    inline double calculate_mass() {
+      return this->rho_l * 4. / 3. * 3.1415 * this->R0 * this->R0 * this->R0 
+        * DropletArray::trapz(this->r_arr, 
+                              this->N_r_arr.array() * this->r3_arr.array());
+    }
+
     void calculate_N0();
 
     void calculate_corr();
@@ -57,6 +81,8 @@ class DropletArray {
 
     double c;
     double omega;
+
+    double rho_l;
 
     // Compute
     double C;
@@ -78,6 +104,10 @@ class DropletArray {
 
     // Solver
     DropletArraySolver* das;
+
+    // Interaction with gas phase
+    double m_evap_pool;
+    double m_evap_total;
 };
 
 class DropletArraySolver {
@@ -128,6 +158,7 @@ class DropletArraySolver {
       ERKStepEvolve(this->erk_mem, tend, this->y, &t, ARK_NORMAL);
 
       this->setU(this->y);
+      this->da->computeRHS();
     }
 
   private:

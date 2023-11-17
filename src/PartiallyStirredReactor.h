@@ -46,6 +46,8 @@ const unsigned int DEFAULT_CHECK_INTERVAL = 1;
 const std::vector<std::string> DEFAULT_CHECK_VARIABLE_NAMES{};
 const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
+const bool DEFAULT_USE_DROPLETARRAY = false;
+const double DEFAULT_TS = 1000.;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
 enum InjectionMode {PREMIXED, NONPREMIXED};
@@ -248,6 +250,22 @@ protected:
     bool check_verbose;
     unsigned int write_raw_interval;
     unsigned int write_stats_interval;
+
+    // Interaction with droplet array
+    bool use_droplet_array;
+    DropletArray droplet_array;
+    double Ts;
+
+    double m_quant;
+    void injectParticles();
+
+    int n_air_particles;
+    int n_fuel_particles;
+    int n_curr_particles;
+
+    int n_inject, n_inject_check;
+
+    void wall_heat(double dt);
 
 private:
     

@@ -8,8 +8,9 @@ int main () {
   double Re_scale = 29059.82905982906;
   double c = 20.;
   double omega = 0.22;
+  double rho_l = 1000.;
 
-  da.initialize(N, R0, k_e, Re_scale, c, omega);
+  da.initialize(N, R0, k_e, Re_scale, c, omega, rho_l);
 
   da.solve_to_time(0.04);
 

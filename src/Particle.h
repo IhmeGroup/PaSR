@@ -204,6 +204,11 @@ public:
         }
     }
 
+    void setT(double T, std::shared_ptr<Cantera::ThermoPhase> gas) {
+        gas->setState_TP(T, P());
+        seth(gas->enthalpy_mass());
+    }
+
     void setState(double h, const double* Y) {
         seth(h);
         setY(Y);
