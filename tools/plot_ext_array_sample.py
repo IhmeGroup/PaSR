@@ -2,10 +2,6 @@ import os
 import glob
 import numpy as np
 import pandas as pd
-from scipy import integrate
-from scipy import interpolate
-from scipy import stats
-from scipy.optimize import fsolve
 import matplotlib.pyplot as plt
 import matplotlib.font_manager
 plt.style.use('default')
@@ -28,14 +24,14 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-parent_dir_pattern = "./Da_*"
+parent_dir_pattern = "./Pe_*"
 sim_dir_pattern = "./sim_*"
 data_file = "particle_data.csv"
 stats_dir = "stats"
 scale = 1.0
 N_levels = 55
-T_extinct = 1200.0
-T_bounds = [800, 1500]
+T_extinct = 1000.0
+T_bounds = [600, 1300]
 figsize = [5, 4]
 
 levels = np.linspace(T_bounds[0], T_bounds[1], N_levels)
@@ -56,13 +52,13 @@ def parseValue(filename, key):
 parent_dirs = glob.glob(parent_dir_pattern)
 n_parents = len(parent_dirs)
 
-Da_arr = np.zeros(n_parents)
+Pe_arr = np.zeros(n_parents)
 
 for ip, parent_dir in enumerate(parent_dirs):
 
     os.chdir(parent_dir)
 
-    Da_arr[ip] = parseValue(parent_dir, "Da")
+    Pe_arr[ip] = parseValue(parent_dir, "Pe")
 
     sim_dirs = glob.glob(sim_dir_pattern)
     n_cases = len(sim_dirs)
@@ -110,10 +106,10 @@ for ip, parent_dir in enumerate(parent_dirs):
     # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
     ax.set_ylabel(r"$\widetilde{Var\left[\tau_{res}\right]}$")
     # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
-    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(Pe_arr[ip]))
 
     plt.tight_layout()
-    plt.savefig("T_fmean_array_var_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
+    plt.savefig("T_fmean_array_var_Pe_{0:.4e}.png".format(Pe_arr[ip]), bbox_inches='tight', dpi=300)
 
     fig, ax = plt.subplots(figsize=figsize)
     im = ax.tricontourf(mu*scale, skew, T_fmean_mean, levels, extend='both')
@@ -127,10 +123,10 @@ for ip, parent_dir in enumerate(parent_dirs):
     # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
     ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
     # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
-    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(Pe_arr[ip]))
 
     plt.tight_layout()
-    plt.savefig("T_fmean_array_skew_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
+    plt.savefig("T_fmean_array_skew_Pe_{0:.4e}.png".format(Pe_arr[ip]), bbox_inches='tight', dpi=300)
 
     fig, ax = plt.subplots(figsize=figsize)
     im = ax.tricontourf(mu*scale, skew, p_lit, levels_01)
@@ -144,7 +140,7 @@ for ip, parent_dir in enumerate(parent_dirs):
     # ax.set_ylabel(r"$\widetilde{\tau_{res}^{''2}}$")
     ax.set_ylabel(r"$\widetilde{Skew\left[\tau_{res}\right]}$")
     # ax.set_title(r"Extinction Map, $Da = {0:.2f}$".format(Da_arr[ip]))
-    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(1.0 / Da_arr[ip]))
+    ax.set_title(r"Extinction Map, $Pe = {0:.2f}$".format(Pe_arr[ip]))
 
     plt.tight_layout()
-    plt.savefig("P_ig_array_skew_Da_{0:.4e}.png".format(Da_arr[ip]), bbox_inches='tight', dpi=300)
+    plt.savefig("P_ig_array_skew_Pe_{0:.4e}.png".format(Pe_arr[ip]), bbox_inches='tight', dpi=300)

@@ -125,42 +125,36 @@ public:
     }
 
     double rho(std::shared_ptr<Cantera::ThermoPhase> gas) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->density();
     }
 
     double rho(Cantera::ThermoPhase* gas) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->density();
     }
 
     double T(std::shared_ptr<Cantera::ThermoPhase> gas) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->temperature();
     }
 
     double T(Cantera::ThermoPhase* gas) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->temperature();
     }
 
     double Z(std::shared_ptr<Cantera::ThermoPhase> gas,
              const std::string& comp_fuel,
              const std::string& comp_ox) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
     double Z(Cantera::ThermoPhase* gas,
              const std::string& comp_fuel,
              const std::string& comp_ox) {
-        gas->setState_PY(P(), Y());
-        gas->setState_HP(h(), P());
+        setGasState(gas);
         return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
@@ -212,6 +206,28 @@ public:
     void setState(const double* state) {
         for (int iv = 0; iv < n_state_variables; iv++) {
             xvec[iv] = state[iv];
+        }
+    }
+
+    void setGasState(std::shared_ptr<Cantera::ThermoPhase> gas) {
+        gas->setState_PY(P(), Y());
+        try {
+            gas->setState_HP(h(), P());
+        }
+        catch (Cantera::CanteraError) {
+            std::cout << "WARNING: Particle " << id << " failed to set state." << std::endl;
+            return;
+        }
+    }
+
+    void setGasState(Cantera::ThermoPhase* gas) {
+        gas->setState_PY(P(), Y());
+        try {
+            gas->setState_HP(h(), P());
+        }
+        catch (Cantera::CanteraError) {
+            std::cout << "WARNING: Particle " << id << " failed to set state." << std::endl;
+            return;
         }
     }
 

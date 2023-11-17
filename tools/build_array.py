@@ -7,8 +7,9 @@ import toml
 ref_file_name = "./input.toml"
 job_file_name = "./job.slurm"
 hist_dir = "./hists"
-Pe_arr = np.array([0.125, 0.25, 0.5])
-N_samples = 1
+# Pe_arr = np.array([0.125, 0.25, 0.5])
+Pe_arr = np.array([0.06, 0.07, 0.08])
+N_samples = 5
 sim_dir_prefix = "sim_"
 overwrite = True
 write_only = False
@@ -62,7 +63,8 @@ for Pe in Pe_arr:
             input_file['Conditions']['tau_res'] = r'{}'.format(
                 os.path.join("../../../", hist_dir, hist_file))
             input_file['Conditions']['tau_mix'] = float(mu * Pe)
-            input_file['Numerics']['t_stop'] = 10.0 * mu
+            input_file['Conditions']['pilot_t_stop'] = 10.0 * mu
+            input_file['Numerics']['t_stop'] = 20.0 * mu
 
             with open(ref_file_name, "w") as file:
                 toml.dump(input_file, file)

@@ -33,14 +33,7 @@ void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas
 void Particle::react(Cantera::ReactorNet* rnet, double dt) {
     Cantera::Reactor* reactor = &rnet->reactor(0);
     Cantera::ThermoPhase* gas = &reactor->contents();
-    gas->setState_PY(P(), Y());
-    try {
-        gas->setState_HP(h(), P());
-    }
-    catch (Cantera::CanteraError) {
-        std::cout << "WARNING: Particle " << id << " failed to set state. No reaction step taken." << std::endl;
-        return;
-    }
+    setGasState(gas);
     reactor->syncState();
     reactor->setInitialVolume(mass / gas->density());
     rnet->advance(rnet->time() + dt);
