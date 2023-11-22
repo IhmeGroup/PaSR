@@ -708,21 +708,22 @@ void PartiallyStirredReactor::takeStep() {
     if (this->use_droplet_array) {
         this->droplet_array.take_step(dt_step);
         this->injectParticles();
+
+        wall_heat(dt_step);
     }
 
     // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     subStepInflow(dt_step);
     // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     for (int isub = 0; isub < n_sub; isub++) {
-        // Effect from hot wall heating
-        // if (this->use_droplet_array)
-            wall_heat(dt_sub);
+
 
         subStepMix(dt_sub);
         // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
         subStepReact(dt_sub);
         // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
     }
+    // std::cout << "react Done" << std::endl;
     // for (Particle& p : pvec) p.print(1.0e-14, gasvec[0]);
 
     // Increment counters
@@ -760,36 +761,23 @@ void PartiallyStirredReactor::injectParticles() {
 
     this->n_inject = n_inject_;
     this->n_inject_check += n_inject_;
-
-    // Debug
-    // this->n_curr_particles = this->n_particles;
 }
 
 void PartiallyStirredReactor::wall_heat(double dt) {
-    // First attempt: heat transfer implemented a * (T - T_target)
-    // where T_target is obtained from random distribution between Ts and T_ox
-    // a is obtained from tau_mix as follows: a = dt / tau_mix
-
-// #pragma omp parallel
-//     {
-//         int tid = omp_get_thread_num();
-// #pragma omp for
-//         for (int ip = 0; ip < n_curr_particles; ++ip) {
-//             double T_target = dists_uni_real[tid](rand_engines[tid]) * (T_ox - Ts) + Ts;
-//             double a = dt / tau_mix;
-//             double T = pvec[ip].T(gasvec[tid]);
-//             double dT = a * (T_target - T);
-//             pvec[ip].setT(T + dT, gasvec[tid]);
-//         }
-//     }
-
-    // First attempt no good since it would over time set temperatures to the mean between Tox and Ts
-    // Second attempt: Fix the id = 0 particle to Ts and let the others equilibrate through mixing
     double T_target = Ts;
-    double a = dt / tau_mix;
     double T = pvec[0].T(gasvec[0]);
-    double dT = a * (T_target - T);
+    double dT = (T_target - T);
     pvec[0].setT(T + dT, gasvec[0]);
+
+    // Ambience BC
+    {
+        double T_target = T_ox;
+        double T = pvec[n_air_particles-1].T(gasvec[0]);
+        double dT = (T_target - T);
+        gasvec[0]->setMixtureFraction(0., comp_fuel, comp_ox);
+        pvec[n_air_particles-1].setY(gasvec[0]->massFractions());
+        pvec[n_air_particles-1].setT(T + dT, gasvec[0]);
+    }
 }
 
 void PartiallyStirredReactor::subStepInflow(double dt) {
@@ -1417,6 +1405,16 @@ double PartiallyStirredReactor::variance(int iv, double meanval, bool all) {
 }
 
 double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+    if (this->use_droplet_array) {
+        double minval = std::numeric_limits<double>::infinity();
+        for (int is = 0; is < this->n_stat; ++is) {
+#pragma omp parallel for reduction(min:minval)
+            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+                minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
+            }
+        }
+        return minval;
+    }
     int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
@@ -1427,6 +1425,16 @@ double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera
 }
 
 double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+    if (this->use_droplet_array) {
+        double maxval = -std::numeric_limits<double>::infinity();
+        for (int is = 0; is < this->n_stat; ++is) {
+#pragma omp parallel for reduction(max:maxval)
+            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+                maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
+            }
+        }
+        return maxval;
+    }
     int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
@@ -1437,6 +1445,24 @@ double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera
 }
 
 double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+    if (this->use_droplet_array) {
+        double rhosum = 0.;
+        double xsum = 0.;
+        for (int is = 0; is < this->n_stat; ++is) {
+#pragma omp parallel for reduction(+:rhosum,xsum)
+            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+                double rho = 0.0;
+                if (favre) {
+                    rho = this->pvec[ip + is * this->n_particles].rho(gasvec[omp_get_thread_num()]);
+                } else {
+                    rho = 1.0;
+                }
+                rhosum += rho;
+                xsum += rho * xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles);
+            }
+        }
+        return xsum / rhosum;
+    }
     int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double rhosum = 0.0;
     double xsum = 0.0;
@@ -1455,6 +1481,16 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
 }
 
 double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+    if (this->use_droplet_array) {
+        double meanval = mean(xfunc, favre);
+        double varsum = 0.0;
+        for (int is = 0; is < this->n_stat; ++is) {
+            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+                varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles) - meanval), 2.0);
+            }
+        }
+        return varsum / n_curr_particles; // TODO: should this be n_curr_particles * n_stat?
+    }
     int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double meanval = mean(xfunc, favre);
     double varsum = 0.0;
