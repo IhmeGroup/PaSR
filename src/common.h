@@ -69,17 +69,17 @@ double weighted_mean_product(const std::vector<T> &x1, const std::vector<T> &x2,
     return weighted_sum / sum_of_weights;
 }
 
-template <typename T>
-double weighted_variance(const std::vector<T> &x, const std::vector<T> &w) {
-    T xmean = weighted_mean(x, w);
-    T weighted_sum = std::transform_reduce(
-        x.begin(),
-        x.end(),
-        w.begin(),
-        std::plus<T>(),
-        [=](const T& xval, const T& wval) {return wval * std::pow(xval - xmean, 2.0);}
-    );
-    T sum_of_weights = std::accumulate(w.begin(), w.end());
-    return weighted_sum / sum_of_weights;
-}
+// template <typename T>
+// double weighted_variance(const std::vector<T> &x, const std::vector<T> &w) {
+//     T xmean = weighted_mean(x, w);
+//     T weighted_sum = std::transform_reduce(
+//         x.begin(),
+//         x.end(),
+//         w.begin(),
+//         std::plus<T>(),
+//         [=](const T& xval, const T& wval) {return wval * std::pow(xval - xmean, 2.0);}
+//     );
+//     T sum_of_weights = std::accumulate(w.begin(), w.end());
+//     return weighted_sum / sum_of_weights;
+// }
 
