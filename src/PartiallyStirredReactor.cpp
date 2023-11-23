@@ -687,7 +687,6 @@ void PartiallyStirredReactor::subStepMix(double dt) {
                     // TODO: particle weights are not used
                     unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
                     unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
-                    double a = dists_uni_real[tid](rand_engines[tid]);
                     pvec_partemp[tid] = (pvec[ip1].getMass() * pvec[ip1] + pvec[ip2].getMass() * pvec[ip2]) /
                         (pvec[ip1].getMass() + pvec[ip2].getMass());
                     pvec[ip1] = pvec_partemp[tid];
