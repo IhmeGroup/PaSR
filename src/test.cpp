@@ -9,8 +9,16 @@ int main () {
   double c = 20.;
   double omega = 0.22;
   double rho_l = 1000.;
+  double Tsat = 371.53327674824317;
+  double kv = 0.01918528617968421;
+  double rhof = 614.2155646136666;
+  double rhov = 3.4709589577683153;
+  double muv = 7.215094092485614e-06;
+  double hfg = 316884.8797578494;
 
-  da.initialize(N, R0, k_e, Re_scale, c, omega, rho_l);
+
+  da.initialize(N, R0, k_e, Re_scale, c, omega, rho_l,
+                 Tsat, kv, rhof, rhov, muv, hfg, 1000.);
 
   da.solve_to_time(0.04);
 

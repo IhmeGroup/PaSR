@@ -15,6 +15,14 @@ const double DEFAUlT_c = 20.;
 const double DEFAUlT_omega = 0.22;
 const double DEFAUlT_rho_l = 1000.;
 
+const double DEFAULT_Tsat = 371.53327674824317;
+const double DEFAULT_kv = 0.01918528617968421;
+const double DEFAULT_rhof = 614.2155646136666;
+const double DEFAULT_rhov = 3.4709589577683153;
+const double DEFAULT_muv = 7.215094092485614e-06;
+const double DEFAULT_hfg = 316884.8797578494;
+const double DEFAULT_Tw = 1000.;
+
 class DropletArraySolver;
 
 class DropletArray {
@@ -25,7 +33,8 @@ class DropletArray {
 
     void initialize(std::string input_file);
 
-    void initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l);
+    void initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l,
+                    double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw);
 
     void computeRHS();
 
@@ -83,6 +92,8 @@ class DropletArray {
     double omega;
 
     double rho_l;
+
+    double Tsat, kv, rhof, rhov, muv, hfg, Tw;
 
     // Compute
     double C;

@@ -29,13 +29,30 @@ void DropletArray::initialize(std::string input_file) {
   std::cout << "> DropletArray.omega = " << omega << std::endl;
   double rho_l = config->get_qualified_as<double>("DropletArray.rho_l").value_or(DEFAUlT_rho_l);
   std::cout << "> DropletArray.rho_l = " << rho_l << std::endl;
+  
+  double  Tsat = config->get_qualified_as<double>("DropletArray.Tsat").value_or(DEFAULT_Tsat);
+  std::cout << "> DropletArray.Tsat = " << Tsat << std::endl;
+  double kv = config->get_qualified_as<double>("DropletArray.kv").value_or(DEFAULT_kv);
+  std::cout << "> DropletArray.kv = " << kv << std::endl;
+  double rhof = config->get_qualified_as<double>("DropletArray.rhof").value_or(DEFAULT_rhof);
+  std::cout << "> DropletArray.rhof = " << rhof << std::endl;
+  double rhov = config->get_qualified_as<double>("DropletArray.rhov").value_or(DEFAULT_rhov);
+  std::cout << "> DropletArray.rhov = " << rhov << std::endl;
+  double muv = config->get_qualified_as<double>("DropletArray.muv").value_or(DEFAULT_muv);
+  std::cout <<  "> DropletArray.muv = " << muv << std::endl;
+  double hfg = config->get_qualified_as<double>("DropletArray.hfg").value_or(DEFAULT_hfg);
+  std::cout << "> DropletArray.hfg = " << hfg << std::endl;
+  double Tw = config->get_qualified_as<double>("DropletArray.Ts").value_or(DEFAULT_Tw);
+  std::cout << "> DropletArray.Ts = " << Tw << std::endl;
 
-  this->initialize(N, R0, k_e, Re_scale, c, omega, rho_l);
+  this->initialize(N, R0, k_e, Re_scale, c, omega, rho_l,
+                   Tsat, kv, rhof, rhov, muv, hfg, Tw);
 }
 
 //--------------------------------------------------------------------------
 
-void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l) {
+void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l,
+                              double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw) {
   this->N = N;
   this->R0 = R0;
   this->k_e = k_e;
@@ -45,6 +62,14 @@ void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, dou
   this->omega = omega;
 
   this->rho_l = rho_l;
+
+  this->Tsat = Tsat;
+  this->kv = kv;
+  this->rhof = rhof;
+  this->rhov = rhov;
+  this->muv = muv;
+  this->hfg = hfg;
+  this->Tw = Tw;
 
   this->r2_arr = Eigen::VectorXd::LinSpaced(this->N, 1e-12, 1.0);
   this->r_arr = this->r2_arr.array().sqrt();
@@ -90,11 +115,20 @@ void DropletArray::calculate_N0() {
 //--------------------------------------------------------------------------
 
 void DropletArray::calculate_corr() {
+  double A1 = kv * (Tw - Tsat) / rhof / hfg;
+  double A2 = rhov * 9.81 / muv;
   for (int i = 0; i < this->N; ++i) {
     double r_actual = this->r_arr[i] * this->R0;
+    double d_drop = 2. * r_actual;
 
-    this->corr_1[i] = 1. + 0.276 * std::pow(this->Re_scale * r_actual, 0.5);
-    this->corr_2[i] = 1. + 8.5 * std::pow(2. * r_actual * 100., 3.*0.45);
+    double Dmax_D0 = 5.;
+    double Dmax = Dmax_D0 * d_drop;
+
+    double C = 0.0024;
+    double f = 2. * C * d_drop / A1 + 3.76 / std::pow(A1,0.75) / std::pow(A2,0.25) * 5. / 9. * std::pow( std::pow(d_drop/2.,2.25) - 9./16.*C*Dmax/2.*std::pow(A2,0.25)/std::pow(A1,0.25)*std::pow(d_drop,2),-4./9.) * (2.25/std::pow(2.,2.25)*std::pow(d_drop,1.25) - 9./16.*C*std::pow(A2/A1,0.25)*Dmax_D0*3./2.*std::pow(d_drop,2));
+
+    this->corr_1[i] = d_drop / f / (this->k_e*1e-6);
+    this->corr_2[i] = 1.;
   }
 }
 
@@ -133,7 +167,7 @@ void DropletArray::solve_to_time(double tend) {
 
   this->das->solve_to_time(tend);
 
-  std::cout << N_r2_arr << std::endl;
+  std::cout << this->corr_1 << std::endl;
 
   this->write_output("test.csv");
 }
