@@ -97,6 +97,7 @@ public:
     double mean(int iv, bool all=false, bool favre=true);
     double variance(int iv, bool all=false, bool favre=true);
     double variance(int iv, double meanval, bool all=false);
+    double sum(int iv, bool all=false);
     void hist(std::vector<double>* histvec, int iv, bool all=false);
 
     void minState(std::vector<double>* minvec, bool all=false);
@@ -129,21 +130,22 @@ protected:
 
     void addVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter,
         VariableType type);
     void addAuxVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter);
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter);
     void addDerivedVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter);
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter);
     void addCheckVariable(int iv);
     void checkVariable(int iv);
 
-    double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
-    double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
-    double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false, bool favre=true);
-    double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false, bool favre=true);
+    double min(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all=false);
+    double max(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all=false);
+    double mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all=false, bool favre=true);
+    double variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all=false, bool favre=true);
+    double sum(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all=false);
     void hist(std::vector<double>* histvec, std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all=false);
 
     std::string convergenceMetricString(ConvergenceMetric convergence_metric_) {
@@ -239,7 +241,7 @@ protected:
     std::vector<double> xmean_old, xvar_old;
 
     std::vector<std::string> aux_variable_names, derived_variable_names;
-    std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)>> variable_functions;
+    std::vector<std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)>> variable_functions;
     std::vector<double> xtemp_derived;
 
     std::vector<std::uniform_int_distribution<unsigned int>> dists_uni_int;

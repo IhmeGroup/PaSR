@@ -171,7 +171,7 @@ public:
 
         kin->getNetProductionRates(temparr.data());
         gas->getPartialMolarEnthalpies(temparr1.data());
-        return -temparr.dot(temparr1);
+        return -temparr.dot(temparr1) / gas->density() * this->mass;
     }
 
     void setID(int id_) {

@@ -450,41 +450,45 @@ void PartiallyStirredReactor::initialize() {
     // Initialize variable functions
     for (int iv = 0; iv < n_state_variables; iv++) {
         variable_functions.push_back(
-            [this, iv](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+            [this, iv](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
                 return pvec[ip].state(iv); });
     }
 
     // Initialize auxiliary variables
     addAuxVariable(
         "id",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].getID(); });
     addAuxVariable(
         "inj_id",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].getInjID(); });
     addAuxVariable(
         "age",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].getAge(); });
     addAuxVariable(
         "tau_res",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].getTauRes(); });
     addAuxVariable(
         "mass",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].getMass(); });
 
     // Initialize derived variables
     addDerivedVariable(
         "T",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].T(gas); });
     addDerivedVariable(
         "Z",
-        [this](std::shared_ptr<Cantera::ThermoPhase> gas, int ip) {
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
             return pvec[ip].Z(gas, comp_fuel, comp_ox); });
+    addDerivedVariable(
+        "HRR",
+        [this](std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip) {
+            return pvec[ip].HRR(gas, kin); });
 
     // Read restart
     if (restart) {
@@ -649,7 +653,8 @@ void PartiallyStirredReactor::checkVariable(int iv) {
         std::left << std::setw(COL_WIDTH) << min(iv, true) <<
         std::left << std::setw(COL_WIDTH) << meanval <<
         std::left << std::setw(COL_WIDTH) << variance(iv, meanval, true) <<
-        std::left << std::setw(COL_WIDTH) << max(iv, true) << std::endl;
+        std::left << std::setw(COL_WIDTH) << max(iv, true) <<
+        std::left << std::setw(COL_WIDTH) << sum(iv, true) << std::endl;
 }
 
 void PartiallyStirredReactor::check(bool force) {
@@ -667,7 +672,8 @@ void PartiallyStirredReactor::check(bool force) {
         std::left << std::setw(COL_WIDTH) << "Min" <<
         std::left << std::setw(COL_WIDTH) << "Favre Mean" <<
         std::left << std::setw(COL_WIDTH) << "Variance" <<
-        std::left << std::setw(COL_WIDTH) << "Max" << std::endl;
+        std::left << std::setw(COL_WIDTH) << "Max" <<
+        std::left << std::setw(COL_WIDTH) << "Sum" << std::endl;
     if (check_verbose) {
         for (int iv = 0; iv < nVariables(); iv++) {
             checkVariable(iv);
@@ -1276,7 +1282,7 @@ void PartiallyStirredReactor::writeRaw(bool force) {
     file.open(RAW_NAME + RAW_EXT, std::ios_base::app);
     for (int ip = 0; ip < n_particles * n_stat; ip++) {
         for (int iv = 0; iv < nVariables(); iv++) {
-            file << std::setprecision(WRITE_PRECISION) << variable_functions[iv](gasvec[0], ip);
+            file << std::setprecision(WRITE_PRECISION) << variable_functions[iv](gasvec[0], kinvec[0], ip);
             if (iv < nVariables()-1) {
                 file << ",";
             } else {
@@ -1298,32 +1304,38 @@ void PartiallyStirredReactor::writeStatsHeaders() {
     std::ofstream file_max;
     std::ofstream file_fmean;
     std::ofstream file_variance;
+    std::ofstream file_sum;
 
     file_min.open(statsPath("min"));
     file_max.open(statsPath("max"));
     file_fmean.open(statsPath("fmean"));
     file_variance.open(statsPath("variance"));
+    file_sum.open(statsPath("sum"));
 
     file_min << "step,time,";
     file_max << "step,time,";
     file_fmean << "step,time,";
     file_variance << "step,time,";
+    file_sum << "step,time,";
 
     for (int iv = 0; iv < nVariables(); iv++) {
         file_min << variableName(iv);
         file_max << variableName(iv);
         file_fmean << variableName(iv);
         file_variance << variableName(iv);
+        file_sum << variableName(iv);
         if (iv < nVariables()-1) {
             file_min << ",";
             file_max << ",";
             file_fmean << ",";
             file_variance << ",";
+            file_sum << ",";
         } else {
             file_min << std::endl;
             file_max << std::endl;
             file_fmean << std::endl;
             file_variance << std::endl;
+            file_sum << std::endl;
         }
     }
 
@@ -1331,6 +1343,7 @@ void PartiallyStirredReactor::writeStatsHeaders() {
     file_max.close();
     file_fmean.close();
     file_variance.close();
+    file_sum.close();
 }
 
 void PartiallyStirredReactor::writeStats(bool force) {
@@ -1340,16 +1353,19 @@ void PartiallyStirredReactor::writeStats(bool force) {
     std::ofstream file_max;
     std::ofstream file_fmean;
     std::ofstream file_variance;
+    std::ofstream file_sum;
 
     file_min.open(statsPath("min"), std::ios_base::app);
     file_max.open(statsPath("max"), std::ios_base::app);
     file_fmean.open(statsPath("fmean"), std::ios_base::app);
     file_variance.open(statsPath("variance"), std::ios_base::app);
+    file_sum.open(statsPath("sum"), std::ios_base::app);
 
     file_min << step << "," << t << ",";
     file_max << step << "," << t << ",";
     file_fmean << step << "," << t << ",";
     file_variance << step << "," << t << ",";
+    file_sum << step << "," << t << ",";
 
     for (int iv = 0; iv < nVariables(); iv++) {
         double meanval = mean(iv, true, true);
@@ -1357,17 +1373,20 @@ void PartiallyStirredReactor::writeStats(bool force) {
         file_max << std::setprecision(WRITE_PRECISION) << max(iv, true);
         file_fmean << std::setprecision(WRITE_PRECISION) << meanval;
         file_variance << std::setprecision(WRITE_PRECISION) << variance(iv, meanval, true);
+        file_sum << std::setprecision(WRITE_PRECISION) << sum(iv, true);
 
         if (iv < nVariables()-1) {
             file_min << ",";
             file_max << ",";
             file_fmean << ",";
             file_variance << ",";
+            file_sum << ",";
         } else {
             file_min << std::endl;
             file_max << std::endl;
             file_fmean << std::endl;
             file_variance << std::endl;
+            file_sum << std::endl;
         }
     }
 
@@ -1375,11 +1394,12 @@ void PartiallyStirredReactor::writeStats(bool force) {
     file_max.close();
     file_fmean.close();
     file_variance.close();
+    file_sum.close();
 }
 
 void PartiallyStirredReactor::addVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter,
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter,
         VariableType type) {
     switch(type) {
         case STATE: {
@@ -1400,7 +1420,7 @@ void PartiallyStirredReactor::addVariable(
 
 void PartiallyStirredReactor::addAuxVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter) {
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter) {
     aux_variable_names.push_back(name);
     variable_functions.push_back(getter);
     n_aux_variables++;
@@ -1408,7 +1428,7 @@ void PartiallyStirredReactor::addAuxVariable(
 
 void PartiallyStirredReactor::addDerivedVariable(
         std::string name,
-        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> getter) {
+        std::function<double(std::shared_ptr<Cantera::ThermoPhase>, std::shared_ptr<Cantera::GasKinetics>, int)> getter) {
     derived_variable_names.push_back(name);
     variable_functions.push_back(getter);
     n_derived_variables++;
@@ -1439,13 +1459,17 @@ double PartiallyStirredReactor::variance(int iv, double meanval, bool all) {
     return variance(variable_functions[iv], meanval, all);
 }
 
-double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+double PartiallyStirredReactor::sum(int iv, bool all) {
+    return sum(variable_functions[iv], all);
+}
+
+double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all) {
     if (this->use_droplet_array) {
         double minval = std::numeric_limits<double>::infinity();
         for (int is = 0; is < this->n_stat; ++is) {
 #pragma omp parallel for reduction(min:minval)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
-                minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
+                minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles));
             }
         }
         return minval;
@@ -1454,18 +1478,18 @@ double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera
     double minval = std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(min:minval)
     for (int ip = 0; ip < ip_stop; ip++) {
-        minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip));
+        minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip));
     }
     return minval;
 }
 
-double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all) {
+double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all) {
     if (this->use_droplet_array) {
         double maxval = -std::numeric_limits<double>::infinity();
         for (int is = 0; is < this->n_stat; ++is) {
 #pragma omp parallel for reduction(max:maxval)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
-                maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
+                maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles));
             }
         }
         return maxval;
@@ -1474,12 +1498,12 @@ double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera
     double maxval = -std::numeric_limits<double>::infinity();
 #pragma omp parallel for reduction(max:maxval)
     for (int ip = 0; ip < ip_stop; ip++) {
-        maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip));
+        maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip));
     }
     return maxval;
 }
 
-double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all, bool favre) {
     if (this->use_droplet_array) {
         double rhosum = 0.;
         double xsum = 0.;
@@ -1493,7 +1517,7 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
                     rho = 1.0;
                 }
                 rhosum += rho;
-                xsum += rho * xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles);
+                xsum += rho * xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles);
             }
         }
         return xsum / rhosum;
@@ -1510,19 +1534,20 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
             rho = 1.0;
         }
         rhosum += rho;
-        xsum += rho * xfunc(gasvec[omp_get_thread_num()], ip);
+        xsum += rho * xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip);
     }
     return xsum / rhosum;
 }
 
-double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase>, int)> xfunc, bool all, bool favre) {
+double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all, bool favre) {
     if (this->use_droplet_array) {
         double meanval = mean(xfunc, favre);
         double varsum = 0.0;
         int n_stat_use = (all) ? this->n_stat : 1;
         for (int is = 0; is < n_stat_use; ++is) {
+#pragma omp parallel for reduction(+:varsum)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
-                varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles) - meanval), 2.0);
+                varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles) - meanval), 2.0);
             }
         }
         return varsum / (n_curr_particles-n_wall_particles-n_amb_particles) / n_stat_use; // TODO: should this be n_curr_particles * n_stat?
@@ -1532,9 +1557,25 @@ double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Ca
     double varsum = 0.0;
 #pragma omp parallel for reduction(+:varsum)
     for (int ip = 0; ip < ip_stop; ip++) {
-        varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip) - meanval), 2.0);
+        varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip) - meanval), 2.0);
     }
     return varsum / n_particles;
+}
+
+double PartiallyStirredReactor::sum(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all) {
+    if (this->use_droplet_array) {
+        int n_stat_use = (all) ? this->n_stat : 1;
+        double xsum = 0.;
+        for (int is = 0; is < n_stat_use; ++is) {
+#pragma omp parallel for reduction(+:xsum)
+            for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) { // Sum HRR from BC particles as well
+                xsum += xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles);
+            }
+        }
+
+        return xsum / n_stat_use;
+    } else
+        return 0.;
 }
 
 void PartiallyStirredReactor::minState(std::vector<double>* minvec, bool all) {
