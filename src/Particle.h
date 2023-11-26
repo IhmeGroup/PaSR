@@ -3,6 +3,7 @@
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
 #include "cantera/thermo/ThermoPhase.h"
+#include "cantera/kinetics/GasKinetics.h"
 #include "cantera/zeroD/ReactorNet.h"
 
 const int c_offset_h = 0; // enthalpy
@@ -164,6 +165,15 @@ public:
         return gas->mixtureFraction(comp_fuel, comp_ox);
     }
 
+    double HRR(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin) {
+        gas->setState_PY(P(), Y());
+        gas->setState_HP(h(), P());
+
+        kin->getNetProductionRates(temparr.data());
+        gas->getPartialMolarEnthalpies(temparr1.data());
+        return -temparr.dot(temparr1);
+    }
+
     void setID(int id_) {
         id = id_;
     }
@@ -176,6 +186,8 @@ public:
         n_species = n_species_;
         n_state_variables = n_species + c_offset_Y;
         xvec.resize(n_state_variables);
+        temparr.resize(n_species);
+        temparr1.resize(n_species);
     }
     
     void setMass(double mass_) {
@@ -235,6 +247,9 @@ protected:
     double mass;
     double tau_res;
     int n_recycles;
+
+    Eigen::VectorXd temparr;
+    Eigen::VectorXd temparr1;
 
 private:
 };

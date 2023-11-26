@@ -7,6 +7,7 @@
 #include "cantera/base/ctexceptions.h"
 #include "cantera/base/Solution.h"
 #include "cantera/thermo/ThermoPhase.h"
+#include "cantera/kinetics/GasKinetics.h"
 #include "cantera/zeroD/IdealGasConstPressureReactor.h"
 #include "cantera/zeroD/ReactorNet.h"
 
@@ -48,6 +49,7 @@ const bool DEFAULT_CHECK_VERBOSE = false;
 const int DEFAULT_WRITE_INTERVAL = -1;
 const bool DEFAULT_USE_DROPLETARRAY = false;
 const double DEFAULT_TS = 1000.;
+const double DEFAULT_NBC_N = 0.1;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
 enum InjectionMode {PREMIXED, NONPREMIXED};
@@ -222,6 +224,7 @@ protected:
 
     std::vector<std::shared_ptr<Cantera::Solution>> solvec;
     std::vector<std::shared_ptr<Cantera::ThermoPhase>> gasvec;
+    std::vector<std::shared_ptr<Cantera::GasKinetics>> kinvec;
     std::vector<Cantera::IdealGasConstPressureReactor*> reactorvec;
     std::vector<Cantera::ReactorNet*> rnetvec;
 
@@ -259,6 +262,11 @@ protected:
     double m_quant;
     void injectParticles();
 
+    double Nbc_N;
+
+    int n_wall_particles;
+    int n_amb_particles;
+    int n_int_particles;
     int n_air_particles;
     int n_fuel_particles;
     int n_curr_particles;

@@ -207,14 +207,33 @@ void PartiallyStirredReactor::parseInput() {
     if (use_droplet_array) {
         this->Ts = config->get_qualified_as<double>("DropletArray.Ts").value_or(DEFAULT_TS);
         std::cout << "> DropletArray.Ts = " << this->Ts << std::endl;
+
+        this->Nbc_N = config->get_qualified_as<double>("DropletArray.Nbc_N").value_or(DEFAULT_NBC_N);
+        std::cout << "> DropletArray.Nbc_N = " << this->Nbc_N << std::endl;
     }
 
     std::cout << "--------------------------------------------------" << std::endl;
 }
 
 void PartiallyStirredReactor::initialize() {
-    if (use_droplet_array)
+    if (use_droplet_array) {
         this->droplet_array.initialize(input_filename);
+        this->n_int_particles = this->n_particles;
+        this->n_wall_particles = this->n_int_particles * this->Nbc_N;
+        this->n_amb_particles = this->n_int_particles * this->Nbc_N;
+        this->n_particles = this->n_int_particles + this->n_wall_particles + this->n_amb_particles;
+
+        // Debug
+        // this->n_int_particles = 98;
+        // this->n_wall_particles = 1;
+        // this->n_amb_particles = 1;
+
+        std::cout << "> DropletArray.n_int_particles = " << this->n_int_particles << std::endl;
+        std::cout << "> DropletArray.n_wall_particles = " << this->n_wall_particles << std::endl;
+        std::cout << "> DropletArray.n_amb_particles = " << this->n_amb_particles << std::endl;
+        std::cout << "> DropletArray.tau_bc = " << this->tau_mix / (double) this->Nbc_N << std::endl;
+    }
+        
 
     step = 0;
     t = 0.0;
@@ -273,6 +292,7 @@ void PartiallyStirredReactor::initialize() {
     std::cout << omp_get_max_threads() << std::endl;
     solvec.resize(omp_get_max_threads());
     gasvec.resize(omp_get_max_threads());
+    kinvec.resize(omp_get_max_threads());
     reactorvec.resize(omp_get_max_threads());
     rnetvec.resize(omp_get_max_threads());
 #pragma omp parallel for
@@ -280,6 +300,7 @@ void PartiallyStirredReactor::initialize() {
         std::cout << "Thread: " << omp_get_thread_num() << std::endl;
         solvec[it] = Cantera::newSolution(mech_filename);
         gasvec[it] = solvec[it]->thermo();
+        kinvec[it] = std::dynamic_pointer_cast<Cantera::GasKinetics>(solvec[it]->kinetics());
         reactorvec[it] = new Cantera::IdealGasConstPressureReactor();
         reactorvec[it]->insert(solvec[it]);
         rnetvec[it] = new Cantera::ReactorNet();
@@ -372,9 +393,10 @@ void PartiallyStirredReactor::initialize() {
         }
     } else {
         std::cout << "Overriding for DropletArray..." << std::endl;
-        this->n_air_particles = (int) ((1.-Zeq) * n_particles);
-        this->n_fuel_particles = this->n_particles - this->n_air_particles;
-        this->n_curr_particles = this->n_air_particles;
+        std::cout << "Zeq = " << Zeq << std::endl;
+        this->n_air_particles = (int) ((1.-Zeq) * n_int_particles);
+        this->n_fuel_particles = this->n_int_particles - this->n_air_particles;
+        this->n_curr_particles = this->n_air_particles + this->n_wall_particles + this->n_amb_particles;
 
         double total_liq_mass = this->droplet_array.get_initial_mass();
         this->m_quant = total_liq_mass / this->n_fuel_particles;
@@ -393,20 +415,24 @@ void PartiallyStirredReactor::initialize() {
                 pvec[ip].setnSpecies(n_species);
                 pvec[ip].setMass(1.0); // TODO: check this (fuel particles lighter?)
 
-                double Z;
-                if (ip < n_air_particles)
+                double Z, T;
+                if (ip < n_wall_particles) {
                     Z = 0.;
-                else
+                    // Wall BC
+                    T = Ts;
+                } else if (ip < n_wall_particles + n_amb_particles) {
+                    // Amb BC
+                    Z = 0.;
+                    T = T_ox;
+                } else if (ip < n_wall_particles + n_amb_particles + n_air_particles) {
+                    // Pure air with uniform dist in T
+                    Z = 0.;
+                    T = Ts + (T_ox-Ts) * (double)(ip - n_wall_particles - n_amb_particles) / (double)(n_air_particles - 1);
+                } else {
+                    // Pure fuel with T_fuel
                     Z = 1.;
-
-                double T;
-                if (ip < n_air_particles)
-                    T = Ts + (T_ox-Ts) * (double)(ip) / (double)(n_air_particles - 1);
-                else
                     T = T_fuel;
-
-                // Debug
-                // T = 1000.;
+                }
 
                 gasvec[tid]->setMixtureFraction(Z, comp_fuel, comp_ox);
                 gasvec[tid]->setState_TP(T, P);
@@ -664,7 +690,7 @@ void PartiallyStirredReactor::check(bool force) {
         std::cout << "> n_inject = " << this->n_inject << " last step, " <<
             this->n_inject_check << " since last check" << std::endl;
         std::cout << "> n_curr_particles = " << this->n_curr_particles << std::endl;
-        std::cout << "> curr_fuel_particles = " << this->n_curr_particles - this->n_air_particles << std::endl;
+        std::cout << "> curr_fuel_particles = " << this->n_curr_particles - this->n_air_particles - this->n_wall_particles - this->n_amb_particles << std::endl;
     }
 }
 
@@ -764,19 +790,20 @@ void PartiallyStirredReactor::injectParticles() {
 }
 
 void PartiallyStirredReactor::wall_heat(double dt) {
-    double T_target = Ts;
-    double T = pvec[0].T(gasvec[0]);
-    double dT = (T_target - T);
-    pvec[0].setT(T + dT, gasvec[0]);
-
+    // Wall BC
+    for (int ip = 0; ip < n_wall_particles; ip++) {
+        pvec[ip].T(gasvec[0]);
+        pvec[ip].setT(Ts, gasvec[0]);
+    }
     // Ambience BC
-    {
+    for (int ip = n_wall_particles; ip < n_wall_particles + n_amb_particles; ip++) {
+        pvec[ip].T(gasvec[0]);
+
         double T_target = T_ox;
-        double T = pvec[n_air_particles-1].T(gasvec[0]);
-        double dT = (T_target - T);
         gasvec[0]->setMixtureFraction(0., comp_fuel, comp_ox);
-        pvec[n_air_particles-1].setY(gasvec[0]->massFractions());
-        pvec[n_air_particles-1].setT(T + dT, gasvec[0]);
+
+        pvec[ip].setY(gasvec[0]->massFractions());
+        pvec[ip].setT(T_target, gasvec[0]);
     }
 }
 
@@ -870,11 +897,19 @@ void PartiallyStirredReactor::subStepMix(double dt) {
             // Iterate over pairs and mix
             for (int ipair = 0; ipair < np_mix; ipair++) {
                 // TODO: particle weights are not used
-                unsigned int ip1 = dists_uni_int[tid](rand_engines[tid]);
-                unsigned int ip2 = dists_uni_int[tid](rand_engines[tid]);
+                unsigned int ip1, ip2;
+                do {
+                    ip1 = dists_uni_int[tid](rand_engines[tid]);
+                    ip2 = dists_uni_int[tid](rand_engines[tid]);
+                } while (ip1 == ip2 ||  (ip1 < n_wall_particles + n_amb_particles && ip2 < n_wall_particles + n_amb_particles));
                 // Assert that the particles are not above n_curr_particles
                 if (ip1 >= n_curr_particles || ip2 >= n_curr_particles) {
                     std::cout << "ERROR: Mixing particles out of bounds." << std::endl;
+                    throw(0);
+                }
+                // Assert that we are not mixing two BC particles
+                if ((ip1 < n_wall_particles + n_amb_particles && ip2 < n_wall_particles + n_amb_particles)) {
+                    std::cout << "ERROR: Mixing two BC particles." << std::endl;
                     throw(0);
                 }
                 double a = dists_uni_real[tid](rand_engines[tid]);
@@ -1409,7 +1444,7 @@ double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera
         double minval = std::numeric_limits<double>::infinity();
         for (int is = 0; is < this->n_stat; ++is) {
 #pragma omp parallel for reduction(min:minval)
-            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+            for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
             }
         }
@@ -1429,7 +1464,7 @@ double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera
         double maxval = -std::numeric_limits<double>::infinity();
         for (int is = 0; is < this->n_stat; ++is) {
 #pragma omp parallel for reduction(max:maxval)
-            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+            for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles));
             }
         }
@@ -1450,7 +1485,7 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
         double xsum = 0.;
         for (int is = 0; is < this->n_stat; ++is) {
 #pragma omp parallel for reduction(+:rhosum,xsum)
-            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+            for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 double rho = 0.0;
                 if (favre) {
                     rho = this->pvec[ip + is * this->n_particles].rho(gasvec[omp_get_thread_num()]);
@@ -1484,12 +1519,13 @@ double PartiallyStirredReactor::variance(std::function<double(std::shared_ptr<Ca
     if (this->use_droplet_array) {
         double meanval = mean(xfunc, favre);
         double varsum = 0.0;
-        for (int is = 0; is < this->n_stat; ++is) {
-            for (int ip = 0; ip < this->n_curr_particles; ++ip) {
+        int n_stat_use = (all) ? this->n_stat : 1;
+        for (int is = 0; is < n_stat_use; ++is) {
+            for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 varsum += std::pow((xfunc(gasvec[omp_get_thread_num()], ip + is * this->n_particles) - meanval), 2.0);
             }
         }
-        return varsum / n_curr_particles; // TODO: should this be n_curr_particles * n_stat?
+        return varsum / (n_curr_particles-n_wall_particles-n_amb_particles) / n_stat_use; // TODO: should this be n_curr_particles * n_stat?
     }
     int ip_stop = (all) ? n_particles * n_stat : n_particles;
     double meanval = mean(xfunc, favre);
