@@ -53,7 +53,7 @@ class DropletArray {
     }
 
     void reset_to_N0();
-    void take_step(double dt_phys);
+    void take_step(double dt_phys, double Tm);
     int inject(double m_quant);
 
     void write_output(std::string filename);
@@ -94,6 +94,8 @@ class DropletArray {
     double rho_l;
 
     double Tsat, kv, rhof, rhov, muv, hfg, Tw;
+
+    double Tm;
 
     // Compute
     double C;

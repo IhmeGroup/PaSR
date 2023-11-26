@@ -95,6 +95,8 @@ void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, dou
 
   this->m_evap_pool = 0.;
   this->m_evap_total = 0.;
+
+  this->Tm = 300.;
 }
 
 //--------------------------------------------------------------------------
@@ -121,14 +123,17 @@ void DropletArray::calculate_corr() {
     double r_actual = this->r_arr[i] * this->R0;
     double d_drop = 2. * r_actual;
 
-    double Dmax_D0 = 5.;
+    double Dmax_D0 = 1.;
     double Dmax = Dmax_D0 * d_drop;
 
     double C = 0.0024;
     double f = 2. * C * d_drop / A1 + 3.76 / std::pow(A1,0.75) / std::pow(A2,0.25) * 5. / 9. * std::pow( std::pow(d_drop/2.,2.25) - 9./16.*C*Dmax/2.*std::pow(A2,0.25)/std::pow(A1,0.25)*std::pow(d_drop,2),-4./9.) * (2.25/std::pow(2.,2.25)*std::pow(d_drop,1.25) - 9./16.*C*std::pow(A2/A1,0.25)*Dmax_D0*3./2.*std::pow(d_drop,2));
 
-    this->corr_1[i] = d_drop / f / (this->k_e*1e-6);
-    this->corr_2[i] = 1.;
+    this->corr_1[i] = r_actual / f / (this->k_e*1e-6);
+
+
+
+    this->corr_2[i] = (1. + 0.276 * std::pow(this->Re_scale * r_actual, 0.5)) * (1. + 8.5 * std::pow(2. * r_actual * 100., 3.*0.45)) / 2.;
   }
 }
 
@@ -138,15 +143,17 @@ void DropletArray::computeRHS() {
   // Calculate N
   N_r_arr = N_r2_arr.array() * 2. * this->r_arr.array();
 
+  double scaleEvap = std::pow(this->Tm / 2200., 3.);
+
   // Calculate dN/dt
   for (int i = 0; i < N; ++i) {
     double FluxL, FluxR;
     if (i < this->N-1)
-      FluxR = -this->N_r2_arr[i+1] * this->corr_1[i+1] * this->corr_2[i+1];
+      FluxR = -this->N_r2_arr[i+1] * (this->corr_1[i+1] + scaleEvap*this->corr_2[i+1]);
     else 
       FluxR = 0.;
 
-    FluxL = -this->N_r2_arr[i] * this->corr_1[i] * this->corr_2[i];
+    FluxL = -this->N_r2_arr[i] * (this->corr_1[i] + scaleEvap*this->corr_2[i]);
 
     double h;
     if (i > 0 && i < N-1)
@@ -200,7 +207,9 @@ void DropletArray::reset_to_N0() {
 
 //--------------------------------------------------------------------------
 
-void DropletArray::take_step(double dt_phys) {
+void DropletArray::take_step(double dt_phys, double Tm) {
+  this->Tm = Tm;
+  // std::cout << "Tm = " << Tm << std::endl;
   // Convert physical time step to dimensionless time step
   double dt = dt_phys / (this->R0 * this->R0 / this->k_e * 1e6);
   double m_pre = this->calculate_mass();

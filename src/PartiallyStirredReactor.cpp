@@ -738,7 +738,9 @@ void PartiallyStirredReactor::takeStep() {
 
     // Step the droplet array and inject if possible
     if (this->use_droplet_array) {
-        this->droplet_array.take_step(dt_step);
+        int iv_T = this->variableIndex("T");
+        double Tm = this->mean(iv_T, false, true);
+        this->droplet_array.take_step(dt_step, Tm);
         this->injectParticles();
 
         wall_heat(dt_step);
@@ -1466,7 +1468,8 @@ double PartiallyStirredReactor::sum(int iv, bool all) {
 double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all) {
     if (this->use_droplet_array) {
         double minval = std::numeric_limits<double>::infinity();
-        for (int is = 0; is < this->n_stat; ++is) {
+        int n_stat_use = (all) ? this->n_stat : 1;
+        for (int is = 0; is < n_stat_use; ++is) {
 #pragma omp parallel for reduction(min:minval)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 minval = std::min(minval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles));
@@ -1486,7 +1489,8 @@ double PartiallyStirredReactor::min(std::function<double(std::shared_ptr<Cantera
 double PartiallyStirredReactor::max(std::function<double(std::shared_ptr<Cantera::ThermoPhase> gas, std::shared_ptr<Cantera::GasKinetics> kin, int ip)> xfunc, bool all) {
     if (this->use_droplet_array) {
         double maxval = -std::numeric_limits<double>::infinity();
-        for (int is = 0; is < this->n_stat; ++is) {
+        int n_stat_use = (all) ? this->n_stat : 1;
+        for (int is = 0; is < n_stat_use; ++is) {
 #pragma omp parallel for reduction(max:maxval)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 maxval = std::max(maxval, xfunc(gasvec[omp_get_thread_num()], kinvec[omp_get_thread_num()], ip + is * this->n_particles));
@@ -1507,7 +1511,8 @@ double PartiallyStirredReactor::mean(std::function<double(std::shared_ptr<Canter
     if (this->use_droplet_array) {
         double rhosum = 0.;
         double xsum = 0.;
-        for (int is = 0; is < this->n_stat; ++is) {
+        int n_stat_use = (all) ? this->n_stat : 1;
+        for (int is = 0; is < n_stat_use; ++is) {
 #pragma omp parallel for reduction(+:rhosum,xsum)
             for (int ip = this->n_wall_particles + this->n_amb_particles; ip < this->n_curr_particles; ++ip) {
                 double rho = 0.0;
