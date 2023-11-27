@@ -210,6 +210,12 @@ void PartiallyStirredReactor::parseInput() {
 
         this->Nbc_N = config->get_qualified_as<double>("DropletArray.Nbc_N").value_or(DEFAULT_NBC_N);
         std::cout << "> DropletArray.Nbc_N = " << this->Nbc_N << std::endl;
+
+        this->forced_ignition = config->get_qualified_as<bool>("DropletArray.forced_ignition").value_or(DEFAULT_FORCED_IGNITION);
+        std::cout << "> DropletArray.forced_ignition = " << this->forced_ignition << std::endl;
+        this->tau_ign = config->get_qualified_as<double>("DropletArray.tau_ign").value_or(DEFAULT_TAU_IGN);
+        std::cout << "> DropletArray.tau_ign = " << this->tau_ign << std::endl;
+        this->ignited = false;
     }
 
     std::cout << "--------------------------------------------------" << std::endl;
@@ -338,6 +344,7 @@ void PartiallyStirredReactor::initialize() {
     gasvec[0]->getMassFractions(Y_mix.data());
     double Zeq = gasvec[0]->mixtureFraction(comp_fuel, comp_ox);
     h_mix = h_fuel * Zeq + h_ox * (1 - Zeq);
+    this->Zeq_ign = Zeq;
 
     // Compute equilibrium state (for initialization)
     gasvec[0]->setState_PY(P, Y_mix.data());
@@ -560,8 +567,8 @@ void PartiallyStirredReactor::initialize() {
     }
 
     // Initialize statistics
-    meanState(&xmean_old, true, true);
-    varianceState(&xvar_old, true, true);
+    // meanState(&xmean_old, true, true);
+    // varianceState(&xvar_old, true, true);
 
     // Initialize output files
     writeRawHeaders();
@@ -735,6 +742,13 @@ void PartiallyStirredReactor::takeStep() {
     calcDt();
 
     // Take substeps
+
+    // Ignite
+    if (this->forced_ignition && this->t > this->tau_ign && !this->ignited) {
+        std::cout << "Forcing ignition at t = " << this->t << std::endl;
+        this->ignited = true;
+        this->ignite();
+    }
 
     // Step the droplet array and inject if possible
     if (this->use_droplet_array) {
@@ -1192,37 +1206,39 @@ void PartiallyStirredReactor::recycleParticle(unsigned int ip, double p_inj, int
 }
 
 void PartiallyStirredReactor::calcConvergence() {
-    switch(convergence_metric) {
-        case MEAN: {
-            meanState(&xtemp1, true, true);
-            rerror = 0.0;
-            for (int iv = 0; iv < n_state_variables; iv++) {
-                rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
-            }
-            rerror = std::sqrt(rerror);
-            break;
-        }
-        case MEAN_VAR: {
-            meanState(&xtemp1, true, true);
-            varianceState(&xtemp2, &xtemp1, true);
-            rerror = 0.0;
-            for (int iv = 0; iv < n_state_variables; iv++) {
-                rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
-                rerror += std::pow((xtemp2[iv] - xvar_old[iv]), 2.0);
-            }
-            rerror = std::sqrt(rerror);
-            break;
-        }
-        case HIST: {
-            throw Cantera::NotImplementedError("PartiallyStirredReactor::calcConvergence",
-                                               "MEAN_VAR not implemented.");
-            break;
-        }
-        default: {
-            throw Cantera::CanteraError("PartiallyStirredReactor::calcConvergence",
-                                        "Invalid mixing model.");
-        }
-    }
+    // switch(convergence_metric) {
+    //     case MEAN: {
+    //         meanState(&xtemp1, true, true);
+    //         rerror = 0.0;
+    //         for (int iv = 0; iv < n_state_variables; iv++) {
+    //             rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
+    //         }
+    //         rerror = std::sqrt(rerror);
+    //         break;
+    //     }
+    //     case MEAN_VAR: {
+    //         meanState(&xtemp1, true, true);
+    //         varianceState(&xtemp2, &xtemp1, true);
+    //         rerror = 0.0;
+    //         for (int iv = 0; iv < n_state_variables; iv++) {
+    //             rerror += std::pow((xtemp1[iv] - xmean_old[iv]), 2.0);
+    //             rerror += std::pow((xtemp2[iv] - xvar_old[iv]), 2.0);
+    //         }
+    //         rerror = std::sqrt(rerror);
+    //         break;
+    //     }
+    //     case HIST: {
+    //         throw Cantera::NotImplementedError("PartiallyStirredReactor::calcConvergence",
+    //                                            "MEAN_VAR not implemented.");
+    //         break;
+    //     }
+    //     default: {
+    //         throw Cantera::CanteraError("PartiallyStirredReactor::calcConvergence",
+    //                                     "Invalid mixing model.");
+    //     }
+    // }
+
+    rerror = 10.;
 }
 
 bool PartiallyStirredReactor::runDone() {
@@ -1584,146 +1600,160 @@ double PartiallyStirredReactor::sum(std::function<double(std::shared_ptr<Cantera
 }
 
 void PartiallyStirredReactor::minState(std::vector<double>* minvec, bool all) {
-    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+//     int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
-    // Min across particles
-    std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
-#pragma omp parallel for reduction(vec_double_min:minvec_temp)
-    for (int ip = 0; ip < ip_stop; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
-        }
-    }
+//     // Min across particles
+//     std::vector<double> minvec_temp(minvec->size(), std::numeric_limits<double>::infinity());
+// #pragma omp parallel for reduction(vec_double_min:minvec_temp)
+//     for (int ip = 0; ip < ip_stop; ip++) {
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             minvec_temp[iv] = std::min(minvec_temp[iv], pvec[ip].state(iv));
+//         }
+//     }
 
-    // Write to minvec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*minvec)[iv] = minvec_temp[iv];
-    }
+//     // Write to minvec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*minvec)[iv] = minvec_temp[iv];
+//     }
+
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::maxState(std::vector<double>* maxvec, bool all) {
-    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+//     int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
-    // Max across particles
-    std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
-#pragma omp parallel for reduction(vec_double_max:maxvec_temp)
-    for (int ip = 0; ip < ip_stop; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
-        }
-    }
+//     // Max across particles
+//     std::vector<double> maxvec_temp(maxvec->size(), -std::numeric_limits<double>::infinity());
+// #pragma omp parallel for reduction(vec_double_max:maxvec_temp)
+//     for (int ip = 0; ip < ip_stop; ip++) {
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             maxvec_temp[iv] = std::max(maxvec_temp[iv], pvec[ip].state(iv));
+//         }
+//     }
 
-    // Write to maxvec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*maxvec)[iv] = maxvec_temp[iv];
-    }
+//     // Write to maxvec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*maxvec)[iv] = maxvec_temp[iv];
+//     }
+    
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::meanState(std::vector<double>* xmeanvec, bool all, bool favre) {
-    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+//     int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
-    // Sum across particles
-    std::vector<double> xsumvec(xmeanvec->size(), 0.0);
-    double rhosum = 0.0;
-#pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < ip_stop; ip++) {
-        double rho;
-        if (favre) {
-            rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
-        } else {
-            rho = 1.0;
-        }
-        rhosum += rho;
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            xsumvec[iv] += rho * pvec[ip].state(iv);
-        }
-    }
+//     // Sum across particles
+//     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
+//     double rhosum = 0.0;
+// #pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
+//     for (int ip = 0; ip < ip_stop; ip++) {
+//         double rho;
+//         if (favre) {
+//             rho = pvec[ip].rho(gasvec[omp_get_thread_num()]);
+//         } else {
+//             rho = 1.0;
+//         }
+//         rhosum += rho;
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             xsumvec[iv] += rho * pvec[ip].state(iv);
+//         }
+//     }
 
-    // Divide by particle count and write to mean vec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*xmeanvec)[iv] = xsumvec[iv] / rhosum;
-    }
+//     // Divide by particle count and write to mean vec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*xmeanvec)[iv] = xsumvec[iv] / rhosum;
+//     }
+        
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::meanState(std::vector<Particle>* pvec_, std::vector<double>* xmeanvec, bool favre) {
-    // Sum across particles
-    std::vector<double> xsumvec(xmeanvec->size(), 0.0);
-    double rhosum = 0.0;
-#pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles; ip++) {
-        double rho;
-        if (favre) {
-            rho = (*pvec_)[ip].rho(gasvec[omp_get_thread_num()]);
-        } else {
-            rho = 1.0;
-        }
-        rhosum += rho;
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            xsumvec[iv] += rho * (*pvec_)[ip].state(iv);
-        }
-    }
+//     // Sum across particles
+//     std::vector<double> xsumvec(xmeanvec->size(), 0.0);
+//     double rhosum = 0.0;
+// #pragma omp parallel for reduction(+:rhosum) reduction(vec_double_plus:xsumvec)
+//     for (int ip = 0; ip < n_particles; ip++) {
+//         double rho;
+//         if (favre) {
+//             rho = (*pvec_)[ip].rho(gasvec[omp_get_thread_num()]);
+//         } else {
+//             rho = 1.0;
+//         }
+//         rhosum += rho;
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             xsumvec[iv] += rho * (*pvec_)[ip].state(iv);
+//         }
+//     }
 
-    // Divide by particle count and write to mean vec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*xmeanvec)[iv] = xsumvec[iv] / rhosum;
-    }
+//     // Divide by particle count and write to mean vec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*xmeanvec)[iv] = xsumvec[iv] / rhosum;
+//     }
+        
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, bool all, bool favre) {
-    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+//     int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
-    // Sum across particles
-    std::vector<double> xmeanvec(xvarvec->size(), 0.0);
-    meanState(&xmeanvec, favre);
-    std::vector<double> xsumvec(xvarvec->size(), 0.0);
-#pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < ip_stop; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            xsumvec[iv] += std::pow((pvec[ip].state(iv) - xmeanvec[iv]), 2.0);
-        }
-    }
+//     // Sum across particles
+//     std::vector<double> xmeanvec(xvarvec->size(), 0.0);
+//     meanState(&xmeanvec, favre);
+//     std::vector<double> xsumvec(xvarvec->size(), 0.0);
+// #pragma omp parallel for reduction(vec_double_plus:xsumvec)
+//     for (int ip = 0; ip < ip_stop; ip++) {
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             xsumvec[iv] += std::pow((pvec[ip].state(iv) - xmeanvec[iv]), 2.0);
+//         }
+//     }
 
-    // Divide by particle count and write to variance vec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*xvarvec)[iv] = xsumvec[iv] / n_particles;
-    }
+//     // Divide by particle count and write to variance vec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*xvarvec)[iv] = xsumvec[iv] / n_particles;
+//     }
+            
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::varianceState(std::vector<Particle>* pvec_, std::vector<double>* xvarvec, bool favre) {
 
-    // Sum across particles
-    std::vector<double> xmeanvec(xvarvec->size(), 0.0);
-    meanState(pvec_, &xmeanvec, favre);
-    std::vector<double> xsumvec(xvarvec->size(), 0.0);
-#pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < n_particles; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            xsumvec[iv] += std::pow(((*pvec_)[ip].state(iv) - xmeanvec[iv]), 2.0);
-        }
-    }
+//     // Sum across particles
+//     std::vector<double> xmeanvec(xvarvec->size(), 0.0);
+//     meanState(pvec_, &xmeanvec, favre);
+//     std::vector<double> xsumvec(xvarvec->size(), 0.0);
+// #pragma omp parallel for reduction(vec_double_plus:xsumvec)
+//     for (int ip = 0; ip < n_particles; ip++) {
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             xsumvec[iv] += std::pow(((*pvec_)[ip].state(iv) - xmeanvec[iv]), 2.0);
+//         }
+//     }
 
-    // Divide by particle count and write to variance vec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*xvarvec)[iv] = xsumvec[iv] / n_particles;
-    }
+//     // Divide by particle count and write to variance vec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*xvarvec)[iv] = xsumvec[iv] / n_particles;
+//     }
+                
+    throw "Not implemented";
 }
 
 void PartiallyStirredReactor::varianceState(std::vector<double>* xvarvec, std::vector<double>* xmeanvec, bool all) {
-    int ip_stop = (all) ? n_particles * n_stat : n_particles;
+//     int ip_stop = (all) ? n_particles * n_stat : n_particles;
 
-    // Sum across particles
-    std::vector<double> xsumvec(xvarvec->size(), 0.0);
-#pragma omp parallel for reduction(vec_double_plus:xsumvec)
-    for (int ip = 0; ip < ip_stop; ip++) {
-        for (int iv = 0; iv < n_state_variables; iv++) {
-            xsumvec[iv] += std::pow((pvec[ip].state(iv) - (*xmeanvec)[iv]), 2.0);
-        }
-    }
+//     // Sum across particles
+//     std::vector<double> xsumvec(xvarvec->size(), 0.0);
+// #pragma omp parallel for reduction(vec_double_plus:xsumvec)
+//     for (int ip = 0; ip < ip_stop; ip++) {
+//         for (int iv = 0; iv < n_state_variables; iv++) {
+//             xsumvec[iv] += std::pow((pvec[ip].state(iv) - (*xmeanvec)[iv]), 2.0);
+//         }
+//     }
 
-    // Divide by particle count and write to variance vec
-    for (int iv = 0; iv < n_state_variables; iv++) {
-        (*xvarvec)[iv] = xsumvec[iv] / n_particles;
-    }
+//     // Divide by particle count and write to variance vec
+//     for (int iv = 0; iv < n_state_variables; iv++) {
+//         (*xvarvec)[iv] = xsumvec[iv] / n_particles;
+//     }
+                    
+    throw "Not implemented";
 }
 
 PartiallyStirredReactor::~PartiallyStirredReactor() {

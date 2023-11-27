@@ -50,6 +50,8 @@ const int DEFAULT_WRITE_INTERVAL = -1;
 const bool DEFAULT_USE_DROPLETARRAY = false;
 const double DEFAULT_TS = 1000.;
 const double DEFAULT_NBC_N = 0.1;
+const bool DEFAULT_FORCED_IGNITION = false;
+const double DEFAULT_TAU_IGN = 0.0;
 
 enum MixingModel {NO_MIX, FULL_MIX, CURL, MOD_CURL, IEM, EMST_1D, EMST, KER_M};
 enum InjectionMode {PREMIXED, NONPREMIXED};
@@ -276,6 +278,25 @@ protected:
     int n_inject, n_inject_check;
 
     void wall_heat(double dt);
+
+    // For forced ignition
+    bool forced_ignition;
+    bool ignited;
+    double tau_ign;
+    double Zeq_ign;
+
+    void ignite() {
+        int imin;
+        double Zmin = 1e10;
+        for (int ip = n_wall_particles+n_air_particles; ip < n_curr_particles; ip++) {
+            double temp = std::fabs(pvec[ip].Z(gasvec[0], comp_fuel, comp_ox)-Zeq_ign);
+            if (temp < Zmin) {
+                Zmin = temp;
+                imin = ip;
+            }
+        }
+        pvec[imin].setT(1500., gasvec[0]);
+    }
 
 private:
     
