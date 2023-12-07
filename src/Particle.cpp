@@ -33,7 +33,9 @@ void Particle::print(double threshold, std::shared_ptr<Cantera::ThermoPhase> gas
 void Particle::react(Cantera::ReactorNet* rnet, double dt) {
     Cantera::Reactor* reactor = &rnet->reactor(0);
     Cantera::ThermoPhase* gas = &reactor->contents();
-    setGasState(gas);
+    if (setGasState(gas)) {
+        return;
+    }
     reactor->syncState();
     reactor->setInitialVolume(mass / gas->density());
     rnet->advance(rnet->time() + dt);
