@@ -33,10 +33,6 @@
 
 # Build
 build/*
-build/CMake*
-build/cmake*
-Makefile
-CMakeLists.txt
 
 # Custom
 .vscode
