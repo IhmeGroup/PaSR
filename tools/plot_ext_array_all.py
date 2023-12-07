@@ -32,12 +32,17 @@ parent_dir_pattern = "./Pe_*"
 sim_dir_pattern = "./sim_*"
 data_file = "particle_data.csv"
 stats_dir = "stats"
-Pe_plot = [0.1, 0.2, 0.3]
+Pe_plot = [0.1, 0.15, 0.2]
 scale = 1.0
 N_levels = 55
-T_extinct = 1200.0
+T_extinct = 1000.0
 T_bounds = [800, 1500]
 figsize = [10, 3.2]
+
+mu_les = 1.727e-3
+skew_les = 1.823
+
+x_ticks = [1.0e-4, 1.0e-3, 1.0e-2]
 
 levels = np.linspace(T_bounds[0], T_bounds[1], N_levels)
 levels_label = np.arange(T_bounds[0], T_bounds[1]+100, 100)
@@ -127,24 +132,29 @@ for ip, parent_dir in enumerate(parent_dirs):
     im = axs_T[ip].tricontourf(mu*scale, skew, T_fmean_mean, levels, extend='both')
     axs_T[ip].tricontour(mu*scale, skew, T_fmean_mean, levels=[T_extinct], colors=['w'], linestyles='dashed', linewidths=2)
     axs_T[ip].scatter(mu*scale, skew, c='k', s=10, marker='X')
+    axs_T[ip].scatter(mu_les, skew_les, c='r', s=150, marker='X')
     axs_T[ip].set_xscale('log')
-    axs_T[ip].set_title(r"$Pe = {0:.1f}$".format(Pe_arr[ip]))
+    axs_T[ip].set_title(r"$Pe = {0:.2f}$".format(Pe_arr[ip]))
     axs_T[ip].set_xlabel(r"$\overline{\tau}_{res}$ [s]")
+    axs_T[ip].set_xticks(x_ticks)
+    axs_T[ip].get_xticklabels()[0].set_horizontalalignment('left')
+    axs_T[ip].get_xticklabels()[-1].set_horizontalalignment('right')
     if ip == 0:
-        axs_T[ip].set_ylabel(r"$\widetilde{\mu}_3$")
+        axs_T[ip].set_ylabel(r"$\gamma_1$ [-]")
     else:
         axs_T[ip].set_yticklabels([])
     if ip == n_parents - 1:
-        cbar = plt.colorbar(im, cax=axs_T[-1], label=r"$\widetilde{T}$ (K)", ticks=levels_label)
+        cbar = plt.colorbar(im, cax=axs_T[-1], label=r"$\overline{T}$ [-]", ticks=levels_label)
         cbar.ax.set_yticklabels(levels_label)
 
     im = axs_p[ip].tricontourf(mu*scale, skew, p_lit, levels_01)
     axs_p[ip].scatter(mu*scale, skew, c='k', s=10, marker='X')
+    axs_p[ip].scatter(mu_les, skew_les, c='r', s=150, marker='X')
     axs_p[ip].set_xscale('log')
-    axs_p[ip].set_title(r"$Pe = {0:.1f}$".format(Pe_arr[ip]))
+    axs_p[ip].set_title(r"$Pe = {0:.2f}$".format(Pe_arr[ip]))
     axs_p[ip].set_xlabel(r"$\overline{\tau}_{res}$ [s]")
     if ip == 0:
-        axs_p[ip].set_ylabel(r"$\widetilde{\mu}_3$")
+        axs_p[ip].set_ylabel(r"$\gamma_1$ [-]")
     else:
         axs_p[ip].set_yticklabels([])
     if ip == n_parents - 1:
@@ -153,8 +163,10 @@ for ip, parent_dir in enumerate(parent_dirs):
 
 fig_T.subplots_adjust(wspace=0.1)
 # fig_T.tight_layout()
-fig_T.savefig("T_fmean_array_skew.png", bbox_inches='tight', dpi=300)
+# fig_T.savefig("T_fmean_array_skew.png", bbox_inches='tight', dpi=300)
+fig_T.savefig("T_fmean_array_skew.pdf", bbox_inches='tight')
 
 fig_p.subplots_adjust(wspace=0.1)
 # fig_p.tight_layout()
-fig_p.savefig("P_ig_array_skew.png", bbox_inches='tight', dpi=300)
+# fig_p.savefig("P_ig_array_skew.png", bbox_inches='tight', dpi=300)
+fig_p.savefig("P_ig_array_skew.pdf", bbox_inches='tight')
