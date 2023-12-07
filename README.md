@@ -1,7 +1,6 @@
 # PaSR
-Parallel partially-stirred reactor code
 
-Some mixing model implementations are based on https://github.com/SuXY15/PaSR/blob/master/PaSR_models.py
+Partially-stirred reactor code with OpenMP parallelization.
 
 ## Table of Contents
 
@@ -101,7 +100,6 @@ If you'd like to contribute, please follow these steps:
 
 1. Z. Ren and S. B. Pope, “An investigation of the performance of turbulent mixing models,” Combustion and Flame, vol. 136, no. 1, pp. 208–216, Jan. 2004, doi: 10.1016/j.combustflame.2003.09.014.
 2. [SuXY15/PaSR](https://github.com/SuXY15/PaSR) - A PaSR implementation in Python
-
 
 ## License
 
