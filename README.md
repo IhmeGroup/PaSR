@@ -98,8 +98,9 @@ If you'd like to contribute, please follow these steps:
 
 ## References
 
-1. Z. Ren and S. B. Pope, “An investigation of the performance of turbulent mixing models,” Combustion and Flame, vol. 136, no. 1, pp. 208–216, Jan. 2004, doi: 10.1016/j.combustflame.2003.09.014.
+1. Z. Ren and S. B. Pope, “An investigation of the performance of turbulent mixing models,” Combustion and Flame, vol. 136, no. 1, pp. 208–216, Jan. 2004, doi: [10.1016/j.combustflame.2003.09.014](https://doi.org/10.1016/j.combustflame.2003.09.014).
 2. [SuXY15/PaSR](https://github.com/SuXY15/PaSR) - A PaSR implementation in Python
+3. [SLACKHA/pyJac](https://github.com/SLACKHA/pyJac/blob/master/pyjac/functional_tester/partially_stirred_reactor.py) - A PaSR implementation using pyJac
 
 ## License
 
