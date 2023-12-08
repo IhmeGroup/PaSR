@@ -7,9 +7,9 @@ name = "restart.csv"
 p_phi_equil = 0.6
 
 [Numerics]
-n_particles = 200
+n_particles = 1000
 # n_steps = 10
-t_stop = 4.0e-3
+t_stop = 20.0e-3
 # dt = 1.0e-6
 # dt_sub = 1.0e-7
 convergence_metric = "MEAN"
@@ -18,8 +18,8 @@ rtol = 1.0e-4
 min_steps_converge = 100
 
 [Models]
-# mixing_model = "MOD_CURL"
-mixing_model = "EMST_1D"
+mixing_model = "MOD_CURL"
+# mixing_model = "EMST_1D"
 
 [Conditions]
 injection_mode = "NONPREMIXED"
@@ -37,8 +37,8 @@ tau_res = 2.0e-3
 tau_mix = 0.7e-3
 
 [Output]
-check_interval = 1
+check_interval = 10
 check_variable_names = ["h", "Y_H2", "Y_O2", "Y_N2", "Y_OH", "Y_H2O", "age", "tau_res", "T", "Z"]
 check_verbose = true
-write_raw_interval = 10
+write_raw_interval = 100
 write_stats_interval = 10

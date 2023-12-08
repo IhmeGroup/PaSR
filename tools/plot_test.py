@@ -1,3 +1,4 @@
+import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -21,12 +22,13 @@ plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
 plt.rc('legend', fontsize=XSMALL_SIZE)   # legend fontsize
 plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
 
-data_file = "./particle_data.csv"
+data_file = sys.argv[1]
 
 data = pd.read_csv(data_file)
 
 plt.figure()
 plt.scatter(data['Z'], data['T'], s=20)
+plt.xlim(0, 1)
 plt.xlabel("$Z$")
 plt.ylabel("$T$ (K)")
 plt.tight_layout()
