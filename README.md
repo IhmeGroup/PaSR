@@ -44,6 +44,11 @@ Navigate to the project directory:
 cd PaSR
 ```
 
+Initialize and update the submodules:
+```bash
+git submodule update --init --recursive
+```
+
 Create a build directory and navigate into it:
 ```bash
 mkdir build
@@ -70,11 +75,6 @@ make install
 The executable will be installed to `/path/to/install/bin`. Optionally, you can add this directory to your PATH environment variable:
 ```bash
 export PATH=$PATH:/path/to/install/bin
-```
-
-Now you can run the application from any directory using:
-```bash
-pasr -i input.toml
 ```
 
 ## Usage
