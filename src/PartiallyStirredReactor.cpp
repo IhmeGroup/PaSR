@@ -171,6 +171,7 @@ void PartiallyStirredReactor::initialize() {
     }
 
     // Initialize ReactorNet for each thread
+    std::cout << "Solving with " << omp_get_max_threads() << " threads." << std::endl;
     std::cout << "Initializing ReactorNet for each thread..." << std::endl;
     solvec.resize(omp_get_max_threads());
     gasvec.resize(omp_get_max_threads());
