@@ -18,7 +18,8 @@ int main () {
 
 
   da.initialize(N, R0, k_e, Re_scale, c, omega, rho_l,
-                 Tsat, kv, rhof, rhov, muv, hfg, 1000.);
+                 Tsat, kv, rhof, rhov, muv, hfg, 1000.,
+                 10.0);
 
   da.solve_to_time(0.04);
 

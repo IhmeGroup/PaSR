@@ -45,14 +45,19 @@ void DropletArray::initialize(std::string input_file) {
   double Tw = config->get_qualified_as<double>("DropletArray.Ts").value_or(DEFAULT_Tw);
   std::cout << "> DropletArray.Ts = " << Tw << std::endl;
 
+  double period = config->get_qualified_as<double>("DropletArray.period").value_or(DEFAULT_PERIOD);
+  std::cout << "> DropletArray.period = " << period << std::endl;
+
   this->initialize(N, R0, k_e, Re_scale, c, omega, rho_l,
-                   Tsat, kv, rhof, rhov, muv, hfg, Tw);
+                   Tsat, kv, rhof, rhov, muv, hfg, Tw,
+                   period);
 }
 
 //--------------------------------------------------------------------------
 
 void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l,
-                              double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw) {
+                              double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw,
+                              double period_phys) {
   this->N = N;
   this->R0 = R0;
   this->k_e = k_e;
@@ -70,6 +75,8 @@ void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, dou
   this->muv = muv;
   this->hfg = hfg;
   this->Tw = Tw;
+
+  this->period_phys = period_phys;
 
   this->r2_arr = Eigen::VectorXd::LinSpaced(this->N, 1e-12, 1.0);
   this->r_arr = this->r2_arr.array().sqrt();
@@ -97,6 +104,7 @@ void DropletArray::initialize(int N, double R0, double k_e, double Re_scale, dou
   this->m_evap_total = 0.;
 
   this->Tm = 300.;
+  this->t_phys = 0.;
 }
 
 //--------------------------------------------------------------------------
@@ -143,7 +151,7 @@ void DropletArray::computeRHS() {
   // Calculate N
   N_r_arr = N_r2_arr.array() * 2. * this->r_arr.array();
 
-  double scaleEvap = std::pow(this->Tm / 2200., 3.);
+  double scaleEvap = 0.6 * std::pow(this->Tm / 2200., 3.);
 
   // Calculate dN/dt
   for (int i = 0; i < N; ++i) {
@@ -208,12 +216,40 @@ void DropletArray::reset_to_N0() {
 //--------------------------------------------------------------------------
 
 void DropletArray::take_step(double dt_phys, double Tm) {
+  // Make sure that dt_phys is not larger than the period
+  if (dt_phys > this->period_phys) {
+    std::cout << "Error: dt_phys = " << dt_phys  << " > period_phys = " << period_phys << std::endl;
+    throw -1;
+  }
+
   this->Tm = Tm;
-  // std::cout << "Tm = " << Tm << std::endl;
   // Convert physical time step to dimensionless time step
-  double dt = dt_phys / (this->R0 * this->R0 / this->k_e * 1e6);
   double m_pre = this->calculate_mass();
-  this->das->solve_to_time(dt);
+
+  if (dt_phys > this->period_phys - this->t_phys) {
+    std::cout << "Next droplet incoming" << std::endl;
+    // Step to end of period
+    double dt1_phys = this->period_phys - this->t_phys;
+    double dt1 = dt1_phys / (this->R0 * this->R0 / this->k_e * 1e6);
+    this->das->solve_to_time(dt1);
+    // Deposit next droplet
+    this->N_r2_arr.array() += this->N0_r2_arr.array();
+    this->computeRHS();
+    m_pre += this->get_initial_mass();
+    // Resume time stepping
+    double dt2_phys = dt_phys - dt1_phys;
+    double dt2 = dt2_phys / (this->R0 * this->R0 / this->k_e * 1e6);
+    this->das->solve_to_time(dt2);
+    // Reset time
+    this->t_phys = dt2_phys;
+  } else {
+    // Step to end of time step
+    double dt = dt_phys / (this->R0 * this->R0 / this->k_e * 1e6);
+    this->das->solve_to_time(dt);
+    // Reset time
+    this->t_phys += dt_phys;
+  }
+
   double m_post = this->calculate_mass();
 
   // Add to m_evap

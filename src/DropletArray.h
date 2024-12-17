@@ -23,6 +23,8 @@ const double DEFAULT_muv = 7.215094092485614e-06;
 const double DEFAULT_hfg = 316884.8797578494;
 const double DEFAULT_Tw = 1000.;
 
+const double DEFAULT_PERIOD = 10.0;
+
 class DropletArraySolver;
 
 class DropletArray {
@@ -34,7 +36,8 @@ class DropletArray {
     void initialize(std::string input_file);
 
     void initialize(int N, double R0, double k_e, double Re_scale, double c, double omega, double rho_l,
-                    double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw);
+                    double Tsat, double kv, double rhof, double rhov, double muv, double hfg, double Tw,
+                    double period_phys);
 
     void computeRHS();
 
@@ -96,6 +99,9 @@ class DropletArray {
     double Tsat, kv, rhof, rhov, muv, hfg, Tw;
 
     double Tm;
+
+    double period_phys;
+    double t_phys;
 
     // Compute
     double C;
