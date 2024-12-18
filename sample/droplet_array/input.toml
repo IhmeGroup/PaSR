@@ -1,0 +1,48 @@
+[DropletArray]
+use_droplet_array = true
+Ts = 1120
+Nbc_N = 0.005
+#forced_ignition = true
+#tau_ign = 0.2
+
+[Mechanism]
+name = "./chem.yaml"
+
+[Initialization]
+restart = false
+p_phi_equil = 0.0
+
+[Numerics]
+n_particles = 200
+t_stop = 10e-1
+dt = 3e-3
+
+convergence_metric = "MEAN"
+stats_window = 1
+rtol = 1.0e-4
+min_steps_converge = 100
+
+[Models]
+mixing_model = "MOD_CURL"
+
+[Conditions]
+injection_mode = "NONPREMIXED"
+pilot_flow = 0.05
+pressure = 101325.0
+comp_fuel = "nc7h16:1.0"
+comp_ox = "o2:0.21,n2:0.79"
+T_fuel = 373.0
+T_ox = 300.0
+phi_global = 1.0
+
+tau_res_mode = "EXP_MEAN"
+tau_res = 1.0e-2
+tau_mix = 0.085e-1 #0.15e-1
+
+[Output]
+check_interval = 10
+check_variable_names = ["h", "Y_nc7h16", "Y_o2", "Y_n2", "Y_co", "Y_oh", "Y_co2", "Y_h2o", "age", "tau_res", "T", "Z"]
+check_verbose = false
+write_raw_interval = 10
+write_stats_interval = 10
+
