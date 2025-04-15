@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15226176.svg)](https://doi.org/10.5281/zenodo.15226176)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15226175.svg)](https://doi.org/10.5281/zenodo.15226175)
 
 # PaSR
 
@@ -110,4 +110,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Citation
 
-Citation information is provided via Zenodo: [10.5281/zenodo.15226176](https://doi.org/10.5281/zenodo.15226176)
+Citation information is provided via Zenodo: [10.5281/zenodo.15226175](https://doi.org/10.5281/zenodo.15226175)
