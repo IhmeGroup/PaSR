@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15226176.svg)](https://doi.org/10.5281/zenodo.15226176)
+
 # PaSR
 
 Partially-stirred reactor code with OpenMP parallelization.
@@ -105,3 +107,7 @@ If you'd like to contribute, please follow these steps:
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Citation
+
+Citation information is provided via Zenodo: [10.5281/zenodo.15226176](https://doi.org/10.5281/zenodo.15226176)
